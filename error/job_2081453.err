@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/./build_mask.py", line 44, in <module>
+    _, mask = get_pixels_hu(patient_dcm)
+  File "/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/preprocessing_base_functions.py", line 41, in get_pixels_hu
+    mask[slice_number] = get_segmented_lungs(image[slice_number])
+NameError: name 'get_segmented_lungs' is not defined

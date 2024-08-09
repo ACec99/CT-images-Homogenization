@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/./build_mask.py", line 44, in <module>
+    path = patients_CT_scans_paths[patientID]
+TypeError: list indices must be integers or slices, not list

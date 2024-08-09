@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/./build_mask.py", line 43, in <module>
+    patient_dcm = load_scan(path)
+  File "/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/preprocessing_base_functions.py", line 12, in load_scan
+    slices = [pydicom.dcmread(path + '/' + s) for s in os.listdir(path)]
+FileNotFoundError: [Errno 2] No such file or directory: '/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/datasets/NSCLC_Radiomics/NSCLC-Radiomics/LUNG1-002/01-01-2014-StudyID-NA-85095/1.000000-NA-61228'

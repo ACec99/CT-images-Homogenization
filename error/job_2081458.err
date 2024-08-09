@@ -1,0 +1,5 @@
+/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/segmentation_function.py:53: UserWarning: Input image is entirely zero, no valid convex hull. Returning empty image
+  l = convex_hull_image(l)
+/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/segmentation_function.py:52: UserWarning: Input image is entirely zero, no valid convex hull. Returning empty image
+  r = convex_hull_image(r)
+slurmstepd: error: *** JOB 2081458 ON alvis1-02 CANCELLED AT 2024-03-15T14:51:55 ***

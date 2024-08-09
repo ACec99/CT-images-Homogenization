@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/./mask_application.py", line 26, in <module>
+    mask = np.load(MASKS_FOLDER + "/", mask_name)
+  File "/apps/Arch/software/SciPy-bundle/2022.05-foss-2022a/lib/python3.10/site-packages/numpy/lib/npyio.py", line 407, in load
+    fid = stack.enter_context(open(os_fspath(file), "rb"))
+IsADirectoryError: [Errno 21] Is a directory: '/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/datasets/NSCLC_Radiomics/segmentation_masks/'

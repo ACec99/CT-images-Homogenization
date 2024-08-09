@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/./masks_selection.py", line 13, in <module>
+    from preprocessing_base_functions import *
+  File "/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/preprocessing_base_functions.py", line 8, in <module>
+    from segmentation_function import get_segmented_lungs
+ModuleNotFoundError: No module named 'segmentation_function'
