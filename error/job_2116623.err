@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/./std_dims_computation.py", line 58, in <module>
-    lung_coord_x = np.where(mask[row] == True)[0]
-IndexError: index 171 is out of bounds for axis 0 with size 105

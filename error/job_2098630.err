@@ -1,6 +1,0 @@
-Traceback (most recent call last):
-  File "/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/./mask_application.py", line 27, in <module>
-    mask = np.load(MASK_FOLDER)
-  File "/apps/Arch/software/SciPy-bundle/2022.05-foss-2022a/lib/python3.10/site-packages/numpy/lib/npyio.py", line 407, in load
-    fid = stack.enter_context(open(os_fspath(file), "rb"))
-TypeError: expected str, bytes or os.PathLike object, not tuple
