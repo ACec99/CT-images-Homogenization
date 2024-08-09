@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/./show_mask.py", line 7, in <module>
-    mask = np.load(MASK_PATH)
-NameError: name 'np' is not defined

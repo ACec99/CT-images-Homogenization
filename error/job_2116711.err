@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/./std_dims_computation.py", line 113, in <module>
-    writer.writerow([key, coord[s0], coords[1]])
-NameError: name 'coord' is not defined. Did you mean: 'coords'?
