@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from piq import SSIMLoss
 
 from core.model import build_model, _GridExtractor, EdgeLoss
 from core.checkpoint import CheckpointIO
@@ -55,6 +56,10 @@ class Solver(nn.Module):
 
         #if self.args.edge_loss:
         # lo inizializzo sempre perchè mi serve a prescindere per calcolare le metriche
+        if args.ssim:
+            self.ssim_loss = SSIMLoss(data_range=1.0) # we put 2 as data_range because it represents the range of the imput data => our data are normalized in [-1,1] => 1 - (-1) = 2
+        else:
+            self.ssim_loss = None
         self.edge_loss = nn.DataParallel(EdgeLoss())
         #else:
         # ---------------------------------------------- #
@@ -104,6 +109,7 @@ class Solver(nn.Module):
         optims = self.optims
         texture_extractor = self.texture_extractor
         edge_loss = self.edge_loss
+        ssim_loss = self.ssim_loss
 
 
         # fetch random validation images for debugging
@@ -207,16 +213,24 @@ class Solver(nn.Module):
 
             # train the generator
             # print("### STO TRAINANDO IL GENERATOR ###")
-            g_loss_lat, g_losses_latent = compute_g_loss(
-                nets, texture_extractor, edge_loss, args, x_real, y_org, y_trg, z_trgs=[z_trg, z_trg2], masks=masks)
+            if args.ssim:
+                g_loss_lat, g_losses_latent = compute_g_loss(
+                    nets, texture_extractor, ssim_loss, args, x_real, y_org, y_trg, z_trgs=[z_trg, z_trg2], masks=masks)
+            else:
+                g_loss_lat, g_losses_latent = compute_g_loss(
+                    nets, texture_extractor, edge_loss, args, x_real, y_org, y_trg, z_trgs=[z_trg, z_trg2], masks=masks)
             self._reset_grad()
             g_loss_lat.backward()
             optims.generator.step()
             optims.mapping_network.step()
             optims.style_encoder.step()
 
-            g_loss_ref, g_losses_ref = compute_g_loss(
-                nets, texture_extractor, edge_loss, args, x_real, y_org, y_trg, x_refs=[x_ref, x_ref2], masks=masks)
+            if args.ssim:
+                g_loss_ref, g_losses_ref = compute_g_loss(
+                    nets, texture_extractor, ssim_loss, args, x_real, y_org, y_trg, x_refs=[x_ref, x_ref2], masks=masks)
+            else:
+                g_loss_ref, g_losses_ref = compute_g_loss(
+                    nets, texture_extractor, edge_loss, args, x_real, y_org, y_trg, x_refs=[x_ref, x_ref2], masks=masks)
             self._reset_grad()
             g_loss_ref.backward()
             optims.generator.step()
@@ -503,8 +517,28 @@ def compute_g_loss(nets, texture_extractor, edge_loss, args, x_real, y_org, y_tr
         if args.edge_loss:
             x_fake_1_ch = x_fake[:, 1, :, :].unsqueeze(1)
             x_real_1_ch = x_real[:, 1, :, :].unsqueeze(1)
-            loss_edge, laplace_x, laplace_y = edge_loss(x_real_1_ch, x_fake_1_ch)
-            loss_edge = loss_edge.mean()
+            if args.ssim:
+                x_fake_min = torch.min(x_fake_1_ch)
+                x_fake_max = torch.max(x_fake_1_ch)
+
+                x_real_min = torch.min(x_real_1_ch)
+                x_real_max = torch.max(x_real_1_ch)
+
+                max = torch.max(x_fake_max, x_real_max).item()
+                min = torch.min(x_fake_min, x_real_min).item()
+
+                x_fake_1_ch = ((x_fake_1_ch - min) / (max - min))
+                x_real_1_ch = ((x_real_1_ch - min) / (max - min))
+
+                """print(x_fake_1_ch)
+                print(x_real_1_ch)"""
+                loss_edge = edge_loss(x_real_1_ch, x_fake_1_ch)
+                #loss_edge = loss_edge[0]
+                #print(f"the first element of loss_edge is {loss_edge}")
+            else:
+                loss_edge, _, _ = edge_loss(x_real_1_ch, x_fake_1_ch)
+                loss_edge = loss_edge.mean() # SSIMLoss compute automatically the average over all the pairs of images
+            #print(f"the mean is {loss_edge}")
             loss = loss_adv + args.lambda_sty * loss_sty \
                    - args.lambda_ds * loss_ds + args.lambda_cyc * loss_cyc + loss_texture + loss_edge
             return loss, Munch(adv=loss_adv.item(),
@@ -524,7 +558,7 @@ def compute_g_loss(nets, texture_extractor, edge_loss, args, x_real, y_org, y_tr
                                texture=loss_texture.item(),
                                )
     else:
-        loss = loss_adv + args.lambda_sty * loss_sty \
+        loss = args.lambda_adv * loss_adv + args.lambda_sty * loss_sty \
                - args.lambda_ds * loss_ds + args.lambda_cyc * loss_cyc
         return loss, Munch(adv=loss_adv.item(),
                            sty=loss_sty.item(),

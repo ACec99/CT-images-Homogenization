@@ -179,6 +179,7 @@ def calculate_metrics(nets, args, step, mode, domains):
                     s_trg = nets.style_encoder(x_ref, y_trg)
 
                 x_fake = nets.generator(x_src, s_trg, masks=masks)
+                print(f"l'x_fake nell'eval è {x_fake.shape}")
                 #group_of_images.append(x_fake)
 
                 # save generated images to calculate FID later
@@ -186,10 +187,12 @@ def calculate_metrics(nets, args, step, mode, domains):
 
                     #if j == 0:
                     patientID = patient_src[k]
+                    # STO MODIFICANDO QUI #
                     if patientID not in volumes_fake_dict:
-                        volumes_fake_dict[patientID] = [x_fake[k]]
+                        volumes_fake_dict[patientID] = [x_fake[k, 1, :, :]]
                     else:
-                        volumes_fake_dict[patientID].append(x_fake[k])
+                        volumes_fake_dict[patientID].append(x_fake[k, 1, :, :])
+                    #
 
                     """filename_single_tif = os.path.join(
                         path_fake_tifs,
@@ -231,9 +234,10 @@ def calculate_metrics(nets, args, step, mode, domains):
                     #print(len(volume_fake))
 
                     for slice_fake in volume_fake:
-                        slice_fake = slice_fake[0].squeeze()
+                        #slice_fake = slice_fake.squeeze()
                         #print(slice_fake.shape)
                         slice_fake = utils.denormalize(slice_fake, args.max_bound, args.min_bound)
+                        print(slice_fake.shape)
                         slice_fake = (slice_fake.cpu()).numpy()
                         img_fake = sitk.GetImageFromArray(slice_fake)
                         mask = img_fake > -1024
@@ -266,7 +270,7 @@ def calculate_metrics(nets, args, step, mode, domains):
                     real_domain = features_real_dict[feature]
                     fake_domain = features_fake_dict[feature]
                     _, p_value = stats.ttest_ind(real_domain, fake_domain)
-                    print("ho calcolato il p_value e lo sto salvando")
+                    #print("ho calcolato il p_value e lo sto salvando")
                     new_line_dataframe = {'feature_name': feature, 'source_domain': src_domain , 'domain_mapped':trg_domain, 't-test': p_value}
                     t_test_dataframe = t_test_dataframe.append(new_line_dataframe, ignore_index=True)
         # delete dataloaders

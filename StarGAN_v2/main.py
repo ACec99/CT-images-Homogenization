@@ -153,12 +153,22 @@ if __name__ == '__main__':
     # weight for objective functions
     parser.add_argument('--lambda_reg', type=float, default=1,
                         help='Weight for R1 regularization')
+
+    # ------------------------------------------------------------------------ #
     parser.add_argument('--lambda_cyc', type=float, default=1,
                         help='Weight for cyclic consistency loss')
     parser.add_argument('--lambda_sty', type=float, default=1,
                         help='Weight for style reconstruction loss')
     parser.add_argument('--lambda_ds', type=float, default=1,
                         help='Weight for diversity sensitive loss')
+    parser.add_argument('--lambda_adv', type=float, default=1,
+                        help='Weight for adversarial loss')
+    parser.add_argument('--lambda_tx', type=float, default=1,
+                        help='Weight for texture loss')
+    parser.add_argument('--lambda_edge', type=float, default=1,
+                        help='Weight for edge loss')
+    # ------------------------------------------------------------------------ #
+
     parser.add_argument('--ds_iter', type=int, default=100000,
                         help='Number of iterations to optimize diversity sensitive loss')
     parser.add_argument('--w_hpf', type=float, default=0,
@@ -192,8 +202,10 @@ if __name__ == '__main__':
                         help='Whether to add texture loss in your model.')
     parser.add_argument('--edge_loss', type=bool, default=False,
                         help='Whether to add edge loss in your model.')
+    parser.add_argument('--ssim', type=bool, default=False,
+                        help='Whether to use SSIM as edge loss in your model.')
     parser.add_argument('--resize_bool', type=bool, default=False,
-                        help='Whether to add texture loss in your model.')
+                        help='Whether to apply transformations in the dataloader.')
 
     # misc
     parser.add_argument('--mode', type=str, required=True,

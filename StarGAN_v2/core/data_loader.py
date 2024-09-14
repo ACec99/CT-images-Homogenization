@@ -312,9 +312,9 @@ def cut_image(image, coords, ref_dims, scale_factor):
     
     ### CROP IMAGE ###
     sub_array = image[start_x:end_x, start_y:end_y]
-    #crop_img = np.full((ref_height, ref_width), -1024)
+    crop_img = np.full((ref_height, ref_width), -1024)
     # ----------------------------------------------------------------------- #
-    crop_img = np.zeros((ref_height, ref_width), dtype=sub_array.dtype)
+    """crop_img = np.zeros((ref_height, ref_width), dtype=sub_array.dtype)"""
     # ----------------------------------------------------------------------- #
     insert_start_row = (crop_img.shape[0] - sub_array.shape[0]) // 2
     insert_start_col = (crop_img.shape[1] - sub_array.shape[1]) // 2
@@ -322,59 +322,6 @@ def cut_image(image, coords, ref_dims, scale_factor):
     # Inserire il sub_array nell'array grande
     crop_img[insert_start_row:insert_start_row + sub_array.shape[0],
     insert_start_col:insert_start_col + sub_array.shape[1]] = sub_array
-    
-    """crop_img = np.full((ref_height, ref_width), -1024)
-    
-    padding = False
-    num_pix_added_sx = 0
-    num_pix_added_dx = 0
-    
-    if end_x > img_width-1:
-        padding = True
-        difference = end_x - (img_width-1)
-        res = difference % 2
-        if res == 0:
-            num_pix_added_sx = difference / 2
-            num_pix_added_dx = difference / 2
-        else:
-            num_pix_added_sx = difference // 2
-            num_pix_added_dx = (difference // 2) + 1
-    elif start_x < 0:
-        padding = True 
-        difference = abs(start_x)
-        res = difference % 2
-        if res == 0:
-            num_pix_added_sx = difference / 2
-            num_pix_added_dx = difference / 2
-        else:
-            num_pix_added_sx = difference // 2
-            num_pix_added_dx = (difference // 2) + 1
-    
-    num_pix_added_dx = int(num_pix_added_dx)
-    num_pix_added_sx = int(num_pix_added_sx)
-    
-    if padding == True:
-            
-        ### additive columns ###
-                
-        additive_cols_sx = np.full((img_height, num_pix_added_sx), -1024)
-        additive_cols_dx = np.full((img_height, num_pix_added_dx), -1024)
-        if start_x < 0:
-            lungs = image[start_y:end_y+1 , 0:end_x+1] 
-        else:
-            lungs = image[start_y:img_height , start_x:img_width] 
-        
-        central_part_temp = np.append(additive_cols_sx,lungs, axis=1)
-        central_part = np.append(central_part_temp,additive_cols_dx, axis=1)
-        
-        ### additive rows ###
-        
-        additive_rows_sx = np.full((num_pix_added_sx, img_width+num_pix_added_sx+num_pix_added_dx), -1024)
-        additive_rows_dx = np.full((num_pix_added_dx, img_width+num_pix_added_sx+num_pix_added_dx), -1024)
-        upper_part = np.append(additive_rows_sx, central_part, axis=0)
-        crop_img = np.append(upper_part, additive_rows_dx, axis=0)
-    else:
-        crop_img = image[start_y:end_y+1 , start_x:end_x+1] """
     
     return crop_img
 
