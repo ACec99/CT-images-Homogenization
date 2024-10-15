@@ -185,11 +185,11 @@ class Solver(nn.Module):
             # fetch images and labels
             inputs = next(fetcher)
             x_real, y_org = inputs.x_src, inputs.y_src
-            # print("shape of x_real is:", x_real.shape)
+            print("shape of x_real is:", x_real.shape)
             x_ref, x_ref2, y_trg = inputs.x_ref, inputs.x_ref2, inputs.y_ref
-            # print("shape of x_ref is:", x_ref.shape)
+            print("shape of x_ref is:", x_ref.shape)
             z_trg, z_trg2 = inputs.z_trg, inputs.z_trg2
-            # print("shape of z_trg is:", z_trg.shape)
+            print("shape of z_trg is:", z_trg.shape)
 
             masks = nets.fan.get_heatmap(x_real) if args.w_hpf > 0 else None
 
@@ -492,6 +492,7 @@ def compute_g_loss(nets, texture_extractor, edge_loss, args, x_real, y_org, y_tr
         s_trg2 = nets.mapping_network(z_trg2, y_trg)
     else:
         s_trg2 = nets.style_encoder(x_ref2, y_trg)
+
     x_fake2 = nets.generator(x_real, s_trg2, masks=masks)
     x_fake2 = x_fake2.detach()
     loss_ds = torch.mean(torch.abs(x_fake - x_fake2))

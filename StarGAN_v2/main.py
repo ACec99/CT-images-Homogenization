@@ -39,9 +39,16 @@ def main(args):
     cudnn.benchmark = True
     torch.manual_seed(args.seed)
 
-    directories = [args.train_img_dir, args.val_img_dir, args.src_dir]
+    # -------------- If we want to take domains in order of dimension -------------- #
+    """directories = [args.train_img_dir, args.val_img_dir, args.src_dir]
     domains_sorted = utils.sort_domains_by_size(directories)
-    domains = domains_sorted[:args.num_domains]
+    domains = domains_sorted[:args.num_domains]"""
+    # ----------------------------------------------------------------------------- #
+    domains = [
+        'GE MEDICAL SYSTEMS LightSpeed QX-i -- BONE',
+        'SIEMENS Sensation 16 -- B30f'
+    ]
+
     domains.sort()
     print("I DOMINI SONO I SEGUENTI:", domains)
     utils.compute_T_tests(args, domains)
@@ -247,7 +254,7 @@ if __name__ == '__main__':
     #parser.add_argument('--domains_fr_dir', type=str, default="/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/datasets/NSCLC_Radiomics/csv_files/feature_per_volume.csv")
 
     # directory of radiomic features for each slice (already preprocessed)
-    parser.add_argument('--fr_per_slice', type=str, default="/mimer/NOBACKUP/groups/naiss2023-6-336/assolito/datasets/csv_files/radiomic_features_per_slice.csv")
+    parser.add_argument('--fr_per_slice', type=str, default="/mimer/NOBACKUP/groups/snic2022-5-277/assolito/csv_files/radiomic_features_per_slice.csv")
 
     # face alignment
     parser.add_argument('--wing_path', type=str, default='experiments/checkpoints/wing.ckpt')

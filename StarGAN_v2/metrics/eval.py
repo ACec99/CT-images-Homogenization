@@ -199,6 +199,7 @@ def calculate_metrics(nets, args, step, mode, domains):
                         '%.4i_%.2i.tif' % (i * args.val_batch_size + (k + 1), j + 1))
                     utils.save_tif(x_fake[k], args.max_bound, args.min_bound, ncol=3,
                                      filename=filename_single_tif)"""
+
                     filename_single_tif = os.path.join(
                         path_fake_tifs,
                         '%.4i_%.2i.tif' % (i, k))
