@@ -47,6 +47,7 @@ def main(args):
     domains = [
         'GE MEDICAL SYSTEMS LightSpeed QX-i -- BONE',
         'SIEMENS Sensation 16 -- B30f'
+        #'GE MEDICAL SYSTEMS LightSpeed16 -- STANDARD'
     ]
 
     domains.sort()

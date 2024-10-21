@@ -12,6 +12,28 @@ from scipy import stats
 import re
 from sklearn.model_selection import ShuffleSplit
 from preprocessing_base_functions import *
+import random, torch, os, numpy as np
+from skimage import filters, morphology, measure
+from torchvision.utils import save_image
+import scipy
+import yaml
+import torch.nn as nn
+
+def RemoveBed(img):
+    mask = img > filters.threshold_otsu(img)
+
+    label_image = measure.label(mask, background=0)
+    props = measure.regionprops(label_image)
+
+    mask = max(props, key=lambda x: x.area)
+    mask = (label_image == mask.label).astype(np.uint8)
+
+    mask = morphology.binary_erosion(mask)
+    mask = scipy.ndimage.binary_fill_holes(mask)
+
+    img[~mask] = -1024 #-1
+
+    return img
 
 def extract_pixel_spacing(args, patient):
     if patient.split('-')[0] == 'LUNG1':
@@ -60,34 +82,64 @@ def reference_dimensions_extractions(args):
 
 
 def domains_selection(args):
-    columns_names = ["patient_ID", "body_part", "scanner", "kernel", "slice_thickness"]
-    #NSCLC_patients_metadata_pd = pd.read_csv(args.NSCLC_metadata, names=columns_names, skiprows=1)
-    LIDC_IDRI_patients_metadata_pd = pd.read_csv(args.LIDC_IDRI_metadata, names=columns_names, skiprows=1)
-    patients_metadata = LIDC_IDRI_patients_metadata_pd #pd.concat([NSCLC_patients_metadata_pd, LIDC_IDRI_patients_metadata_pd], axis=0)
-    if args.domain_type == 'kernel':
-        patients_metadata = patients_metadata[['patient_ID', 'kernel']]
-    else:
-        patients_metadata = patients_metadata[['patient_ID', 'scanner', 'kernel']]
-
     domains_dict = {}
-    for _, row in patients_metadata.iterrows():
+    if args.stargan_data:
+        for folder in os.listdir(args.StarGAN_dataset):
+            folder_path = os.path.join(args.StarGAN_dataset, folder)
+            for dom_folder in os.listdir(folder_path):
+                dom_folder_path = os.path.join(folder_path, dom_folder)
+                for patient_file in os.listdir(dom_folder_path):
+                    patient_slice = patient_file.split('.')[0]
+                    patient = patient_slice.rsplit('-', 1)[0]
+                    if dom_folder not in domains_dict:
+                        domains_dict[dom_folder] = [patient]
+                    else:
+                        domains_dict[dom_folder].append(patient)
+    else:
+        columns_names = ["patient_ID", "body_part", "scanner", "kernel", "slice_thickness"]
+        #NSCLC_patients_metadata_pd = pd.read_csv(args.NSCLC_metadata, names=columns_names, skiprows=1)
+        LIDC_IDRI_patients_metadata_pd = pd.read_csv(args.LIDC_IDRI_metadata, names=columns_names, skiprows=1)
+        patients_metadata = LIDC_IDRI_patients_metadata_pd #pd.concat([NSCLC_patients_metadata_pd, LIDC_IDRI_patients_metadata_pd], axis=0)
         if args.domain_type == 'kernel':
-            domain = row['kernel']
+            patients_metadata = patients_metadata[['patient_ID', 'kernel']]
         else:
-            domain = row['scanner'] + ' -- ' + row['kernel']
-        patient = row['patient_ID']
-        if domain not in domains_dict:
-            domains_dict[domain] = [patient]
-        else:
-            domains_dict[domain].append(patient)
+            patients_metadata = patients_metadata[['patient_ID', 'scanner', 'kernel']]
 
-    domains_dict_support = domains_dict.copy()
+        for _, row in patients_metadata.iterrows():
+            if args.domain_type == 'kernel':
+                domain = row['kernel']
+            else:
+                domain = row['scanner'] + ' -- ' + row['kernel']
+            patient = row['patient_ID']
+            if domain not in domains_dict:
+                domains_dict[domain] = [patient]
+            else:
+                domains_dict[domain].append(patient)
 
-    for dom in domains_dict_support:
-        if len(domains_dict[dom]) > 90 or len(domains_dict[dom]) < 55:
-            del domains_dict[dom]
+        domains_dict_support = domains_dict.copy()
+
+        for dom in domains_dict_support:
+            if len(domains_dict[dom]) > 90 or len(domains_dict[dom]) < 55:
+                del domains_dict[dom]
 
     return domains_dict
+
+def padding(img):
+    outer_shape = (512, 512)
+    # inner_shape = image_crop.shape
+    inner_shape = img.shape
+    outer_array = np.full(outer_shape, -1024)
+    # inner_array = image_crop
+    inner_array = img
+
+    # Calcoliamo gli indici di slicing per inserire l'array interno al centro dell'array esterno
+    start_index = tuple((np.array(outer_shape) - np.array(inner_shape)) // 2)
+    end_index = tuple(start_index + np.array(inner_shape))
+
+    # Inseriamo l'array interno al centro dell'array esterno
+    outer_array[start_index[0]:end_index[0], start_index[1]:end_index[1]] = inner_array
+
+    return outer_array
 
 def RFs_extraction(args, group, extractor, coords_dict, ref_dims_dict, RFs_per_slice = None, dom=None):
     radiomic_features_group_dict = {}
@@ -97,48 +149,62 @@ def RFs_extraction(args, group, extractor, coords_dict, ref_dims_dict, RFs_per_s
         else:
             PATIENT_FOLDER_PATH = os.path.join(args.LIDC_IDRI_dataset, patient)
         pixel_spacing = extract_pixel_spacing(args, patient)
-        if pixel_spacing[0] < 0.8:
-            patient_folder_list = os.listdir(PATIENT_FOLDER_PATH)
-            radiomic_features_patient_dict = {}
-            for num_slice, f_dcm in enumerate(patient_folder_list):
-                DCM_PATH = os.path.join(PATIENT_FOLDER_PATH, f_dcm)
+        #if pixel_spacing[0] < 0.8: # insert only if you want to make a computation on no outliers dataset
+        patient_folder_list = os.listdir(PATIENT_FOLDER_PATH)
+        radiomic_features_patient_dict = {}
+        for num_slice, f_dcm in enumerate(patient_folder_list):
+            DCM_PATH = os.path.join(PATIENT_FOLDER_PATH, f_dcm)
 
-                # read dicom file
-                dcm_read = pydicom.dcmread(DCM_PATH)
-                # take the pixels array from the first dicom file (image1)
-                # dcm_px = dcm_read.pixel_array
-                px_slices = get_pixels_hu([dcm_read])
+            # read dicom file
+            dcm_read = pydicom.dcmread(DCM_PATH)
+            # take the pixels array from the first dicom file (image1)
+            # dcm_px = dcm_read.pixel_array
+            px_slices = get_pixels_hu([dcm_read])
 
-                # resample
-                image_resampled, real_resize_factor = resample(px_slices, [dcm_read], [0.8, 0.8]) #[1.0, 1.0])
-                coords_patient = coords_dict[patient]
-                image_crop = cut_image(image_resampled, coords_patient, ref_dims_dict, real_resize_factor)
+            # resample
+            image_resampled, real_resize_factor = resample(px_slices, [dcm_read], [1.0, 1.0])
 
-                # transform the pixel array into a SimpleITK image
-                img = sitk.GetImageFromArray(image_crop)
-                mask = img > -1024
-                try:
-                    features_slice = extractor.execute(img, mask)
-                    for feature_name in features_slice.keys():
-                        if feature_name.startswith("original_"):  # Filter only radiomic features
-                            if RFs_per_slice is not None:
-                                RFs_per_slice.append([patient, num_slice, dom, feature_name, features_slice[feature_name]])
-                            if feature_name in radiomic_features_patient_dict:
-                                radiomic_features_patient_dict[feature_name].append(features_slice[feature_name].item())
-                            else:
-                                radiomic_features_patient_dict[feature_name] = [features_slice[feature_name].item()]
-                except ValueError as e:
-                    print(f"Error extracting features for patient {patient}: {str(e)}")
-                    continue
+            # ------------------------ padding addition in order to have coherence in the comparison --------------------- #
+            image_padded = padding(image_resampled)
 
-            ### now, we have to obtain the mean of each list computed, in order to have for each feature one value for each volume ###
-            for feature in radiomic_features_patient_dict:
-                radiomic_features_patient_dict[feature] = np.array(radiomic_features_patient_dict[feature])
-                volume_feature = np.mean(radiomic_features_patient_dict[feature])
-                if feature not in radiomic_features_group_dict:
-                    radiomic_features_group_dict[feature] = [volume_feature]
-                else:
-                    radiomic_features_group_dict[feature].append(volume_feature)
+            #normalization and denormalization in order to apply the bed filter on a normalized image (and not on HU image)#
+            image_normalized = 2 * ((image_padded - args.min_bound) / (args.max_bound - args.min_bound)) - 1
+            image_normalized = RemoveBed(image_normalized)
+            image_denormalized = ((image_normalized + 1) * (args.max_bound - args.min_bound) / 2) + args.min_bound
+
+            # ----------------------------------- hai modificato qui ------------------------------------ #
+            #coords_patient = coords_dict[patient]
+            #image_crop = cut_image(image_resampled, coords_patient, ref_dims_dict, real_resize_factor)
+            # ------------------------------------------------------------------------------------------- #
+
+            # transform the pixel array into a SimpleITK image
+            #img = sitk.GetImageFromArray(image_crop)
+            #img = sitk.GetImageFromArray(image_resampled)
+            img = sitk.GetImageFromArray(image_denormalized)
+
+            mask = img > -1024
+            try:
+                features_slice = extractor.execute(img, mask)
+                for feature_name in features_slice.keys():
+                    if feature_name.startswith("original_"):  # Filter only radiomic features
+                        if RFs_per_slice is not None:
+                            RFs_per_slice.append([patient, num_slice, dom, feature_name, features_slice[feature_name]])
+                        if feature_name in radiomic_features_patient_dict:
+                            radiomic_features_patient_dict[feature_name].append(features_slice[feature_name].item())
+                        else:
+                            radiomic_features_patient_dict[feature_name] = [features_slice[feature_name].item()]
+            except ValueError as e:
+                print(f"Error extracting features for patient {patient}: {str(e)}")
+                continue
+
+        ### now, we have to obtain the mean of each list computed, in order to have for each feature one value for each volume ###
+        for feature in radiomic_features_patient_dict:
+            radiomic_features_patient_dict[feature] = np.array(radiomic_features_patient_dict[feature])
+            volume_feature = np.mean(radiomic_features_patient_dict[feature])
+            if feature not in radiomic_features_group_dict:
+                radiomic_features_group_dict[feature] = [volume_feature]
+            else:
+                radiomic_features_group_dict[feature].append(volume_feature)
 
     return radiomic_features_group_dict
 
@@ -246,6 +312,17 @@ if __name__ == '__main__':
                         default='kernel',
                         choices=['kernel', 'scanner-kernel'],
                         help='how aggregate data in domains')
+    # normalization dimensions
+    parser.add_argument('--min_bound', type=float, default=-1024.0)
+    parser.add_argument('--max_bound', type=float, default=400.0)
+    # ------------------ TEMPORANEO (to obtain kernel subdivision from the scanner-kernel one already existing -------------- #
+    parser.add_argument('--stargan_data', type=bool,
+                        default=False,
+                        help='whether we are taking data from a model dataset already created')
+    parser.add_argument('--StarGAN_dataset', type=str,
+                        default='/mimer/NOBACKUP/groups/snic2022-5-277/assolito/StarGAN_scanner_kernel_px_reduced_dataset',
+                        help='Directory of StarGAN dataset with scanner-kernel domains')
+    # ----------------------------------------------------------------------------------------------------------------------- #
 
     args = parser.parse_args()
 
@@ -298,7 +375,7 @@ if __name__ == '__main__':
                     else:
                         radiomic_features_dict[f].append(dom_RFs[f])
         if RFs_per_slice:
-            radiomic_features_per_slice_csv = os.path.join(args.csv_folder, "radiomic_features_per_slice_no_outliers_(scanner_kernel_dataset).csv")
+            radiomic_features_per_slice_csv = os.path.join(args.csv_folder, "radiomic_features_per_slice.csv")
 
             with open(radiomic_features_per_slice_csv, "w", newline="") as file_csv:
                 writer = csv.writer(file_csv)
@@ -313,7 +390,7 @@ if __name__ == '__main__':
             domains = domains_comparison
     T_test_pd = pd.DataFrame(T_test_dict, index=domains)
     T_test_pd = T_test_pd.T
-    T_test_csv = os.path.join(args.csv_folder, "T_test_" + args.type + "_domains_no_outliers_(scanner_kernel_dataset).csv")
+    T_test_csv = os.path.join(args.csv_folder, "T_test_" + args.type + "_domains_(scanner_kernel_without_bed).csv")
     T_test_pd.to_csv(T_test_csv)
 
 

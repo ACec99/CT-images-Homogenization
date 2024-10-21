@@ -34,6 +34,7 @@ from core import utils
 import datetime
 import logging
 
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
@@ -48,7 +49,7 @@ def check_mask_for_labels(mask):
 
 
 @torch.no_grad()
-def calculate_metrics(nets, args, step, mode, domains):
+def calculate_metrics(nets, args, step, mode, domains, edge_loss):
     print('Calculating evaluation metrics...')
     assert mode in ['latent', 'reference']
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -88,6 +89,8 @@ def calculate_metrics(nets, args, step, mode, domains):
     # TODO DA DECOMMENTARE LA PROSSIMA RIGA
     #features_table['values'] = features_table['values'].apply(ast.literal_eval)
 
+    edge_per_dom_translation = {}
+
     #lpips_dict = OrderedDict()
     for trg_idx, trg_domain in enumerate(domains):
 
@@ -120,8 +123,7 @@ def calculate_metrics(nets, args, step, mode, domains):
                                          resize=args.resize_bool)
 
         for src_idx, src_domain in enumerate(src_domains):
-            #gc.collect()
-            #if device != 'cpu':
+            edge_values = []
             path_src = os.path.join(args.val_img_dir, src_domain)
             loader_src = get_eval_loader(root=path_src,
                                          lung_coords=coords_dict,
@@ -135,34 +137,20 @@ def calculate_metrics(nets, args, step, mode, domains):
 
             ### CREAZIONE DELLA COPPIA DI DOMINI DA COMPARARE ###
             task = '%s_to_%s' % (src_domain, trg_domain)
-
-            #path_fake_imgs = os.path.join(args.eval_dir, task)
-            #path_fake_grid = os.path.join(args.eval_dir, task)
             path_fake_tifs = os.path.join(args.tifs_dir, task)
             if os.path.exists(path_fake_tifs):
                 shutil.rmtree(path_fake_tifs, ignore_errors=True)
-            #shutil.rmtree(path_fake_imgs, ignore_errors=True)
-            #shutil.rmtree(path_fake_grid, ignore_errors=True)
             os.makedirs(path_fake_tifs)
-            #os.makedirs(path_fake_imgs)
-
-            #lpips_values = []
-            #print('Generating images and calculating LPIPS for %s...' % task)
             volumes_fake_dict = {}
             for i, x_src_complete in enumerate(tqdm(loader_src, total=len(loader_src))):
                 torch.cuda.empty_cache()
                 x_src , patient_src = x_src_complete
-                #print(x_src.shape)
-                #print(patient_src)
                 N = x_src.size(0)
                 x_src = x_src.to(device)
                 y_trg = torch.tensor([trg_idx] * N).to(device)
                 masks = nets.fan.get_heatmap(x_src) if args.w_hpf > 0 else None
 
                 # generate 10 outputs from the same input
-                #group_of_images = []
-                #for j in range(args.num_outs_per_domain):
-                #print("sono entrato nel ciclo per generare j output per lo stesso x_src")
                 if mode == 'latent':
                     z_trg = torch.randn(N, args.latent_dim).to(device)
                     s_trg = nets.mapping_network(z_trg, y_trg)
@@ -179,26 +167,28 @@ def calculate_metrics(nets, args, step, mode, domains):
                     s_trg = nets.style_encoder(x_ref, y_trg)
 
                 x_fake = nets.generator(x_src, s_trg, masks=masks)
-                print(f"l'x_fake nell'eval è {x_fake.shape}")
-                #group_of_images.append(x_fake)
 
                 # save generated images to calculate FID later
                 for k in range(N):
-
-                    #if j == 0:
                     patientID = patient_src[k]
-                    # STO MODIFICANDO QUI #
-                    if patientID not in volumes_fake_dict:
-                        volumes_fake_dict[patientID] = [x_fake[k, 1, :, :]]
-                    else:
-                        volumes_fake_dict[patientID].append(x_fake[k, 1, :, :])
-                    #
 
-                    """filename_single_tif = os.path.join(
-                        path_fake_tifs,
-                        '%.4i_%.2i.tif' % (i * args.val_batch_size + (k + 1), j + 1))
-                    utils.save_tif(x_fake[k], args.max_bound, args.min_bound, ncol=3,
-                                     filename=filename_single_tif)"""
+                    # edge extraction
+                    slice_fake = ((x_fake[k, 1, :, :].squeeze(0)).cpu()).numpy()
+                    slice_fake = utils.RemoveBed(slice_fake)
+
+                    slice_real = ((x_src[k, 1, :, :].squeeze(0)).cpu()).numpy()
+                    slice_real = utils.RemoveBed(slice_real)
+
+                    tensor_real = ((torch.tensor(slice_real)).unsqueeze(0)).unsqueeze(0)
+                    tensor_fake = ((torch.tensor(slice_fake)).unsqueeze(0)).unsqueeze(0)
+                    slice_edge, _, _ = edge_loss(tensor_real, tensor_fake)
+                    edge_values.append(slice_edge.item())
+
+                    if patientID not in volumes_fake_dict:
+                        volumes_fake_dict[patientID] = [slice_fake] #[x_fake[k, 1, :, :]]
+                    else:
+                        volumes_fake_dict[patientID].append(slice_fake) #(x_fake[k, 1, :, :])
+                    #
 
                     filename_single_tif = os.path.join(
                         path_fake_tifs,
@@ -206,19 +196,9 @@ def calculate_metrics(nets, args, step, mode, domains):
                     utils.save_tif(x_fake[k], args.max_bound, args.min_bound, ncol=1,
                                      filename=filename_single_tif)
 
-                """lpips_value = calculate_lpips_given_images(group_of_images)
-                lpips_values.append(lpips_value)"""
-            # gc.collect()
-            # if device != 'cpu':
             torch.cuda.empty_cache()
-            ### dentro a lpips_values ci sono 32 (numero di immagini presenti mel loader_src) lpips_values ###
-            ### lpips_value rappresenta la media della distanza (differenza) di ciascuna immagine genera
-
-            # calculate LPIPS for each task (e.g. dom1_i2dom_j)
-            """lpips_mean = np.array(lpips_values).mean()
-            lpips_dict['LPIPS_%s/%s' % (mode, task)] = lpips_mean"""
-            ### per ogni task (coppia di domini dove uno è la sorgente e l'altro è il target = stile di riferimento) viene calcolato un lpips ###
-
+            edge_values_mean = np.mean(np.array(edge_values))
+            edge_per_dom_translation[task] = edge_values_mean
             ### RADIOMIC FEATURE COMPARISONS ###
             if mode == 'latent':
                 print("Calculating radiomic features...")
@@ -238,8 +218,8 @@ def calculate_metrics(nets, args, step, mode, domains):
                         #slice_fake = slice_fake.squeeze()
                         #print(slice_fake.shape)
                         slice_fake = utils.denormalize(slice_fake, args.max_bound, args.min_bound)
-                        print(slice_fake.shape)
-                        slice_fake = (slice_fake.cpu()).numpy()
+                        #print(slice_fake.shape)
+                        #slice_fake = (slice_fake.cpu()).numpy()
                         img_fake = sitk.GetImageFromArray(slice_fake)
                         mask = img_fake > -1024
                         #mask_check = check_mask_for_labels(mask)
@@ -279,6 +259,13 @@ def calculate_metrics(nets, args, step, mode, domains):
         if mode == 'reference':
             del loader_ref
             del iter_ref
+
+    df = pd.DataFrame(list(edge_per_dom_translation.items()), columns=['Domain Translation', 'Edge Mean'])
+    # Salva il DataFrame in un file CSV
+    edge_csv_filename = os.path.join(args.eval_dir, 'edge_mean_per_domain_%.5i.csv' % step)
+    df.to_csv(edge_csv_filename, index=False)
+
+    print("File CSV creato con successo!")
 
     if mode == 'latent':
         t_test_dataframe.to_csv(T_test_filename, index=False)

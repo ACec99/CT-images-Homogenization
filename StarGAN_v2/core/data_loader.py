@@ -61,6 +61,7 @@ class DefaultDataset(data.Dataset):
             image = transofrm_image(dcm_read, image, self.lung_coords, self.ref_dims)
 
             image = 2*((image - self.min_bound) / (self.max_bound - self.min_bound))-1
+            #image = utils.RemoveBed(image)
 
             if self.transform is not None:
                 image = self.transform(image)
@@ -76,6 +77,7 @@ class DefaultDataset(data.Dataset):
         else:
             image = tifffile.imread(f_path)
             image = 2 * ((image - self.min_bound) / (self.max_bound - self.min_bound)) - 1
+            #image = utils.RemoveBed(image)
 
             image = torch.tensor(image, dtype=torch.float32)
             patientID = os.path.basename(f_path)
@@ -124,7 +126,8 @@ class SourceDataset(data.Dataset):
         image = dcm_read.pixel_array
         image = transofrm_image(dcm_read,image,self.lung_coords,self.ref_dims)
         image = 2 * ((image - self.min_bound) / (self.max_bound - self.min_bound)) - 1
-        
+        #image = utils.RemoveBed(image) # filter the image in order to remove the bed and have only lungs
+
         image = torch.tensor(image, dtype=torch.float32)
         
         image = image.unsqueeze(dim=0)
@@ -183,7 +186,9 @@ class ReferenceDataset(data.Dataset):
         image2 = transofrm_image(dcm_2_read,image2,self.lung_coords,self.ref_dims)
 
         image1 = 2 * ((image1 - self.min_bound) / (self.max_bound - self.min_bound)) - 1
+        #image1 = utils.RemoveBed(image1)
         image2 = 2 * ((image2 - self.min_bound) / (self.max_bound - self.min_bound)) - 1
+        #image2 = utils.RemoveBed(image2)
         
         image1 = torch.tensor(image1, dtype=torch.float32)
         image2 = torch.tensor(image2, dtype=torch.float32)
@@ -325,6 +330,23 @@ def cut_image(image, coords, ref_dims, scale_factor):
     
     return crop_img
 
+def padding(img):
+    outer_shape = (512, 512)
+    # inner_shape = image_crop.shape
+    inner_shape = img.shape
+    outer_array = np.full(outer_shape, -1024)
+    # inner_array = image_crop
+    inner_array = img
+
+    # Calcoliamo gli indici di slicing per inserire l'array interno al centro dell'array esterno
+    start_index = tuple((np.array(outer_shape) - np.array(inner_shape)) // 2)
+    end_index = tuple(start_index + np.array(inner_shape))
+
+    # Inseriamo l'array interno al centro dell'array esterno
+    outer_array[start_index[0]:end_index[0], start_index[1]:end_index[1]] = inner_array
+
+    return outer_array
+
 
 def transofrm_image(dcm_slice, image, coords, reference_dims):
 
@@ -359,20 +381,9 @@ def transofrm_image(dcm_slice, image, coords, reference_dims):
     patientID = dcm_slice.PatientID
     coords_patient = coords[patientID]
     image_crop = cut_image(image_resampled, coords_patient, reference_dims, real_resize_factor)
-    
-    outer_shape = (512,512)
-    inner_shape = image_crop.shape
-    outer_array = np.full(outer_shape,-1024)
-    inner_array = image_crop
+    image_padded = padding(image_crop)
 
-    # Calcoliamo gli indici di slicing per inserire l'array interno al centro dell'array esterno
-    start_index = tuple((np.array(outer_shape) - np.array(inner_shape)) // 2)
-    end_index = tuple(start_index + np.array(inner_shape))
-    
-    # Inseriamo l'array interno al centro dell'array esterno
-    outer_array[start_index[0]:end_index[0], start_index[1]:end_index[1]] = inner_array
-
-    return outer_array
+    return image_padded
 
 
 def get_train_loader(root, lung_coords,ref_dims, min_bound, max_bound, domains,

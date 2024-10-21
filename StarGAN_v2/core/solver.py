@@ -393,8 +393,8 @@ class Solver(nn.Module):
 
             # compute FID and LPIPS if necessary
             if (i + 1) % args.eval_every == 0:
-                calculate_metrics(nets_ema, args, i + 1, mode='latent', domains=self.domains)
-                calculate_metrics(nets_ema, args, i + 1, mode='reference', domains=self.domains)
+                calculate_metrics(nets_ema, args, i + 1, mode='latent', domains=self.domains, edge_loss=edge_loss)
+                calculate_metrics(nets_ema, args, i + 1, mode='reference', domains=self.domains, edge_loss=edge_loss)
 
         #shutil.rmtree(args.tifs_dir, ignore_errors=True)
 
@@ -422,7 +422,7 @@ class Solver(nn.Module):
         nets_ema = self.nets_ema
         resume_iter = args.resume_iter
         self._load_checkpoint(args.resume_iter)
-        calculate_metrics(nets_ema, args, step=resume_iter, mode='latent', domains=self.domains)
+        calculate_metrics(nets_ema, args, step=resume_iter, mode='latent', domains=self.domains, edge_loss=self.edge_loss)
 
         #calculate_metrics(nets_ema, args, step=resume_iter, mode='reference', domains=self.domains)
 

@@ -21,6 +21,7 @@ from tqdm import tqdm
 import ffmpeg
 
 import math
+import scipy
 from scipy import stats
 import pandas as pd
 import pydicom
@@ -33,6 +34,10 @@ import torch.nn.functional as F
 import torchvision
 import torchvision.utils as vutils
 from PIL import Image, ImageColor, ImageDraw, ImageFont
+
+import random, torch, os, numpy as np
+from skimage import filters, morphology, measure
+import yaml
 
 def extract_metadata(args):
 
@@ -115,6 +120,7 @@ def compute_T_tests(args, domains):
     mask = data['patientID'].isin(volumes_of_interest)
 
     data = data[mask]
+    data['domain'] = data['domain'].str.replace('QX/i', 'QX-i', regex=False)
 
     #print(data)
 
@@ -649,3 +655,32 @@ def save_video(fname, images, output_fps=30, vcodec='libx264', filters=''):
 def tensor2ndarray255(images):
     images = torch.clamp(images * 0.5 + 0.5, 0, 1)
     return images.cpu().numpy().transpose(0, 2, 3, 1) * 255
+
+def RemoveBed(img):
+
+    nan_mask = np.isnan(img)
+
+    # handle nan values
+    if np.sum(nan_mask) > 0:
+        # Use nearest-neighbor interpolation to fill NaNs
+        filled_image = ndimage.generic_filter(img, np.nanmean, size=3, mode='mirror')
+
+        # Replace NaNs with interpolated values
+        img[nan_mask] = filled_image[nan_mask]
+
+    mask = img > filters.threshold_otsu(img)
+    print(f"the mask size is:{mask.shape}")
+
+    label_image = measure.label(mask, background=0)
+    print(label_image.shape)
+    props = measure.regionprops(label_image)
+
+    mask = max(props, key=lambda x: x.area)
+    mask = (label_image == mask.label).astype(np.uint8)
+
+    mask = morphology.binary_erosion(mask)
+    mask = scipy.ndimage.binary_fill_holes(mask)
+
+    img[~mask] = -1024 #-1
+
+    return img
