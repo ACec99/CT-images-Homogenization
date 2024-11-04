@@ -120,7 +120,9 @@ def compute_T_tests(args, domains):
     mask = data['patientID'].isin(volumes_of_interest)
 
     data = data[mask]
+    #print(data['domain'])
     data['domain'] = data['domain'].str.replace('QX/i', 'QX-i', regex=False)
+    #print(data['domain'])
 
     #print(data)
 

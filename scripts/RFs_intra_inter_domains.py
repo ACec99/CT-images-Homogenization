@@ -31,7 +31,7 @@ def RemoveBed(img):
     mask = morphology.binary_erosion(mask)
     mask = scipy.ndimage.binary_fill_holes(mask)
 
-    img[~mask] = -1024 #-1
+    img[~mask] = -1
 
     return img
 
@@ -97,9 +97,9 @@ def domains_selection(args):
                         domains_dict[dom_folder].append(patient)
     else:
         columns_names = ["patient_ID", "body_part", "scanner", "kernel", "slice_thickness"]
-        #NSCLC_patients_metadata_pd = pd.read_csv(args.NSCLC_metadata, names=columns_names, skiprows=1)
+        NSCLC_patients_metadata_pd = pd.read_csv(args.NSCLC_metadata, names=columns_names, skiprows=1)
         LIDC_IDRI_patients_metadata_pd = pd.read_csv(args.LIDC_IDRI_metadata, names=columns_names, skiprows=1)
-        patients_metadata = LIDC_IDRI_patients_metadata_pd #pd.concat([NSCLC_patients_metadata_pd, LIDC_IDRI_patients_metadata_pd], axis=0)
+        patients_metadata = pd.concat([NSCLC_patients_metadata_pd, LIDC_IDRI_patients_metadata_pd], axis=0) #LIDC_IDRI_patients_metadata_pd
         if args.domain_type == 'kernel':
             patients_metadata = patients_metadata[['patient_ID', 'kernel']]
         else:
@@ -109,6 +109,7 @@ def domains_selection(args):
             if args.domain_type == 'kernel':
                 domain = row['kernel']
             else:
+                row['scanner'] = row['scanner'].replace('QX/i', 'QX-i')
                 domain = row['scanner'] + ' -- ' + row['kernel']
             patient = row['patient_ID']
             if domain not in domains_dict:
@@ -148,7 +149,7 @@ def RFs_extraction(args, group, extractor, coords_dict, ref_dims_dict, RFs_per_s
             PATIENT_FOLDER_PATH = os.path.join(args.NSCLC_dataset, patient)
         else:
             PATIENT_FOLDER_PATH = os.path.join(args.LIDC_IDRI_dataset, patient)
-        pixel_spacing = extract_pixel_spacing(args, patient)
+        #pixel_spacing = extract_pixel_spacing(args, patient)
         #if pixel_spacing[0] < 0.8: # insert only if you want to make a computation on no outliers dataset
         patient_folder_list = os.listdir(PATIENT_FOLDER_PATH)
         radiomic_features_patient_dict = {}
@@ -250,7 +251,7 @@ def T_test(args, g1_RFs_dict, g2_RFs_dict, T_test_dict, domains):
             RF_g1 = g1_RFs_dict[f]
             RF_g2 = g2_RFs_dict[f]
 
-            _, p_value = stats.ttest_ind(RF_g1, RF_g2)
+            _, p_value = stats.ttest_ind(RF_g1, RF_g2, equal_var=False)
 
             if f not in T_test_dict:
                 T_test_dict[f] = [p_value]
@@ -267,7 +268,7 @@ def T_test(args, g1_RFs_dict, g2_RFs_dict, T_test_dict, domains):
                     fr_dom_1 = g1_RFs_dict[f][i]
                     fr_dom_2 = g1_RFs_dict[f][j]
 
-                    _, p_value = stats.ttest_ind(fr_dom_1, fr_dom_2)
+                    _, p_value = stats.ttest_ind(fr_dom_1, fr_dom_2, equal_var=False)
 
                     if f not in T_test_dict:
                         T_test_dict[f] = [p_value]
@@ -375,7 +376,7 @@ if __name__ == '__main__':
                     else:
                         radiomic_features_dict[f].append(dom_RFs[f])
         if RFs_per_slice:
-            radiomic_features_per_slice_csv = os.path.join(args.csv_folder, "radiomic_features_per_slice.csv")
+            radiomic_features_per_slice_csv = os.path.join(args.csv_folder, "radiomic_features_per_slice_complete.csv")
 
             with open(radiomic_features_per_slice_csv, "w", newline="") as file_csv:
                 writer = csv.writer(file_csv)
@@ -390,7 +391,7 @@ if __name__ == '__main__':
             domains = domains_comparison
     T_test_pd = pd.DataFrame(T_test_dict, index=domains)
     T_test_pd = T_test_pd.T
-    T_test_csv = os.path.join(args.csv_folder, "T_test_" + args.type + "_domains_(scanner_kernel_without_bed).csv")
+    T_test_csv = os.path.join(args.csv_folder, "T_test_" + args.type + "_domains_(scanner_kernel_without_bed)_complete.csv")
     T_test_pd.to_csv(T_test_csv)
 
 

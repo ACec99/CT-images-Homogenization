@@ -45,9 +45,11 @@ def main(args):
     domains = domains_sorted[:args.num_domains]"""
     # ----------------------------------------------------------------------------- #
     domains = [
-        'GE MEDICAL SYSTEMS LightSpeed QX-i -- BONE',
-        'SIEMENS Sensation 16 -- B30f'
-        #'GE MEDICAL SYSTEMS LightSpeed16 -- STANDARD'
+        #'GE MEDICAL SYSTEMS LightSpeed QX-i -- BONE',
+        'SIEMENS Sensation 16 -- B30f',
+        'GE MEDICAL SYSTEMS LightSpeed16 -- STANDARD'
+        #'GE MEDICAL SYSTEMS LightSpeed Pro 16 -- STANDARD'
+        #'SIEMENS Sensation Open -- B30f'
     ]
 
     domains.sort()

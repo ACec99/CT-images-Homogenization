@@ -250,7 +250,8 @@ def calculate_metrics(nets, args, step, mode, domains, edge_loss):
                 for feature in features_fake_dict:
                     real_domain = features_real_dict[feature]
                     fake_domain = features_fake_dict[feature]
-                    _, p_value = stats.ttest_ind(real_domain, fake_domain)
+                    #_, p_value = stats.ttest_ind(real_domain, fake_domain)
+                    _, p_value = stats.ttest_ind(real_domain, fake_domain, equal_var=False)
                     #print("ho calcolato il p_value e lo sto salvando")
                     new_line_dataframe = {'feature_name': feature, 'source_domain': src_domain , 'domain_mapped':trg_domain, 't-test': p_value}
                     t_test_dataframe = t_test_dataframe.append(new_line_dataframe, ignore_index=True)

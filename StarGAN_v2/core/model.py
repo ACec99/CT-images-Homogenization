@@ -161,7 +161,7 @@ class EdgeLoss(nn.Module):
         new_filter[:, :, ::2, ::2] = down * 4  # upsample
         filtered = self.conv_gauss(new_filter)  # filter
         diff = current.to(self.kernel.device) - filtered
-        return torch.tanh(diff * 5) #diff
+        return torch.tanh(diff * 15) #diff
 
     def forward(self, x, y):
         laplacian_x = self.laplacian_kernel(x)
