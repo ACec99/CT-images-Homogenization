@@ -348,11 +348,18 @@ class Solver(nn.Module):
                         axs[5, 1].set_title('loss_g_texture_reference')
 
                     if args.edge_loss:
-                        axs[6, 0].plot(x_axis, training_history['loss_g_edge_latent'])
-                        axs[6, 0].set_title('loss_g_edge_latent')
+                        if args.ssim:
+                            axs[6, 0].plot(x_axis, training_history['loss_g_edge_latent'])
+                            axs[6, 0].set_title('loss_g_ssim_latent')
 
-                        axs[6, 1].plot(x_axis, training_history['loss_g_edge_reference'])
-                        axs[6, 1].set_title('loss_g_edge_reference')
+                            axs[6, 1].plot(x_axis, training_history['loss_g_edge_reference'])
+                            axs[6, 1].set_title('loss_g_ssim_reference')
+                        else:
+                            axs[6, 0].plot(x_axis, training_history['loss_g_edge_latent'])
+                            axs[6, 0].set_title('loss_g_edge_latent')
+
+                            axs[6, 1].plot(x_axis, training_history['loss_g_edge_reference'])
+                            axs[6, 1].set_title('loss_g_edge_reference')
 
                     plt.tight_layout()
 
@@ -509,37 +516,59 @@ def compute_g_loss(nets, texture_extractor, edge_loss, args, x_real, y_org, y_tr
     if args.texture_loss:
         start = 128 # (512-256)/2
         end = start + 256 # 128 + 256
+        #if z_trgs is not None:
         # ---------------------------------------------------------- #
         x_rec_1_ch = x_rec[:, 1, start:end, start:end].unsqueeze(1)
         x_real_1_ch = x_real[:, 1, start:end, start:end].unsqueeze(1)
         # ---------------------------------------------------------- #
-        #print("la dimensione dell'img che passo alla loss texture è:", x_rec_prove.shape, x_real_prove.shape)
         loss_texture, laplace_x, laplace_y = _texture_loss(x_rec_1_ch, x_real_1_ch, args, texture_extractor, nets.attention_layer)
+        #else:
+        #    x_fake_1_ch = x_rec[:, 1, start:end, start:end].unsqueeze(1)
+        #    x_ref_1_ch = x_ref[:, 1, start:end, start:end].unsqueeze(1)
+        #    loss_texture, laplace_x, laplace_y = _texture_loss(x_fake_1_ch, x_ref_1_ch, args, texture_extractor, nets.attention_layer)
         if args.edge_loss:
-            x_fake_1_ch = x_fake[:, 1, :, :].unsqueeze(1)
-            x_real_1_ch = x_real[:, 1, :, :].unsqueeze(1)
-            if args.ssim:
-                x_fake_min = torch.min(x_fake_1_ch)
-                x_fake_max = torch.max(x_fake_1_ch)
+            #x_fake_1_ch = x_fake[:, 1, :, :].unsqueeze(1)
+            #x_real_1_ch = x_real[:, 1, :, :].unsqueeze(1)
 
-                x_real_min = torch.min(x_real_1_ch)
-                x_real_max = torch.max(x_real_1_ch)
+            # edge extraction
+            #slice_fake = (x_fake[:, 1, :, :].cpu()).numpy()
+            slice_fake = (x_fake[:, 1, :, :]).detach().cpu().numpy()
+            slice_fake_copy = slice_fake.copy()
+            for sf in range(slice_fake_copy.shape[0]):
+                slice_without_bed = utils.RemoveBed(slice_fake_copy[sf, :, :])
+                slice_fake[sf, :, :] = slice_without_bed
+
+            #slice_real = (x_src[:, 1, :, :].cpu()).numpy()
+            slice_real = (x_real[:, 1, :, :]).detach().cpu().numpy()
+
+            slice_real_copy = slice_real.copy()
+            for sr in range(slice_real_copy.shape[0]):
+                slice_without_bed = utils.RemoveBed(slice_fake_copy[sr, :, :])
+                slice_real[sr, :, :] = slice_without_bed
+
+            tensor_real = (torch.tensor(slice_real)).unsqueeze(1)
+            tensor_fake = (torch.tensor(slice_fake)).unsqueeze(1)
+
+            if args.ssim:
+                x_fake_min = torch.min(tensor_fake)
+                x_fake_max = torch.max(tensor_fake)
+
+                x_real_min = torch.min(tensor_real)
+                x_real_max = torch.max(tensor_real)
 
                 max = torch.max(x_fake_max, x_real_max).item()
                 min = torch.min(x_fake_min, x_real_min).item()
 
-                x_fake_1_ch = ((x_fake_1_ch - min) / (max - min))
-                x_real_1_ch = ((x_real_1_ch - min) / (max - min))
+                x_fake_1_ch = ((tensor_fake - min) / (max - min))
+                x_real_1_ch = ((tensor_real - min) / (max - min))
 
-                """print(x_fake_1_ch)
-                print(x_real_1_ch)"""
                 loss_edge = edge_loss(x_real_1_ch, x_fake_1_ch)
                 #loss_edge = loss_edge[0]
                 #print(f"the first element of loss_edge is {loss_edge}")
             else:
-                loss_edge, _, _ = edge_loss(x_real_1_ch, x_fake_1_ch)
+                loss_edge, _, _ = edge_loss(tensor_real, tensor_fake)
                 loss_edge = loss_edge.mean() # SSIMLoss compute automatically the average over all the pairs of images
-            #print(f"the mean is {loss_edge}")
+
             loss = loss_adv + args.lambda_sty * loss_sty \
                    - args.lambda_ds * loss_ds + args.lambda_cyc * loss_cyc + loss_texture + loss_edge
             return loss, Munch(adv=loss_adv.item(),
