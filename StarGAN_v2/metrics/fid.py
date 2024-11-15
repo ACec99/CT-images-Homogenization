@@ -126,7 +126,10 @@ def calculate_fid_given_paths(paths, lung_coords, ref_dims, min_bound, max_bound
         actvs = torch.cat(actvs, dim=0).cpu().detach().numpy()
         mu.append(np.mean(actvs, axis=0))
         cov.append(np.cov(actvs, rowvar=False))
+        del actvs
     fid_value = frechet_distance(mu[0], cov[0], mu[1], cov[1])
+    del mu
+    del cov
     return fid_value
 
 

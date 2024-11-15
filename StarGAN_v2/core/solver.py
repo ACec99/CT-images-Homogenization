@@ -516,29 +516,16 @@ def compute_g_loss(nets, texture_extractor, edge_loss, args, x_real, y_org, y_tr
     if args.texture_loss:
         start = 128 # (512-256)/2
         end = start + 256 # 128 + 256
-        #if z_trgs is not None:
-        # ---------------------------------------------------------- #
         x_rec_1_ch = x_rec[:, 1, start:end, start:end].unsqueeze(1)
         x_real_1_ch = x_real[:, 1, start:end, start:end].unsqueeze(1)
-        # ---------------------------------------------------------- #
         loss_texture, laplace_x, laplace_y = _texture_loss(x_rec_1_ch, x_real_1_ch, args, texture_extractor, nets.attention_layer)
-        #else:
-        #    x_fake_1_ch = x_rec[:, 1, start:end, start:end].unsqueeze(1)
-        #    x_ref_1_ch = x_ref[:, 1, start:end, start:end].unsqueeze(1)
-        #    loss_texture, laplace_x, laplace_y = _texture_loss(x_fake_1_ch, x_ref_1_ch, args, texture_extractor, nets.attention_layer)
         if args.edge_loss:
-            #x_fake_1_ch = x_fake[:, 1, :, :].unsqueeze(1)
-            #x_real_1_ch = x_real[:, 1, :, :].unsqueeze(1)
-
-            # edge extraction
-            #slice_fake = (x_fake[:, 1, :, :].cpu()).numpy()
             slice_fake = (x_fake[:, 1, :, :]).detach().cpu().numpy()
             slice_fake_copy = slice_fake.copy()
             for sf in range(slice_fake_copy.shape[0]):
                 slice_without_bed = utils.RemoveBed(slice_fake_copy[sf, :, :])
                 slice_fake[sf, :, :] = slice_without_bed
 
-            #slice_real = (x_src[:, 1, :, :].cpu()).numpy()
             slice_real = (x_real[:, 1, :, :]).detach().cpu().numpy()
 
             slice_real_copy = slice_real.copy()

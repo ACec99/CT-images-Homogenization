@@ -179,16 +179,15 @@ def calculate_metrics(nets, args, step, mode, domains, edge_loss):
                     slice_real = ((x_src[k, 1, :, :].squeeze(0)).cpu()).numpy()
                     slice_real = utils.RemoveBed(slice_real)
 
-                    tensor_real = ((torch.tensor(slice_real)).unsqueeze(0)).unsqueeze(0)
-                    tensor_fake = ((torch.tensor(slice_fake)).unsqueeze(0)).unsqueeze(0)
+                    tensor_real = (((torch.tensor(slice_real)).unsqueeze(0)).unsqueeze(0)).to(device)
+                    tensor_fake = (((torch.tensor(slice_fake)).unsqueeze(0)).unsqueeze(0)).to(device)
                     slice_edge, _, _ = edge_loss(tensor_real, tensor_fake)
                     edge_values.append(slice_edge.item())
 
                     if patientID not in volumes_fake_dict:
-                        volumes_fake_dict[patientID] = [slice_fake] #[x_fake[k, 1, :, :]]
+                        volumes_fake_dict[patientID] = [slice_fake.to(device)] #[x_fake[k, 1, :, :]]
                     else:
-                        volumes_fake_dict[patientID].append(slice_fake) #(x_fake[k, 1, :, :])
-                    #
+                        volumes_fake_dict[patientID].append(slice_fake.to(device)) #(x_fake[k, 1, :, :])
 
                     filename_single_tif = os.path.join(
                         path_fake_tifs,
@@ -271,16 +270,6 @@ def calculate_metrics(nets, args, step, mode, domains, edge_loss):
     if mode == 'latent':
         t_test_dataframe.to_csv(T_test_filename, index=False)
 
-    # calculate the average LPIPS for all tasks
-    """lpips_mean = 0
-    for _, value in lpips_dict.items():
-        lpips_mean += value / len(lpips_dict)
-    lpips_dict['LPIPS_%s/mean' % mode] = lpips_mean"""
-
-    # report LPIPS values
-    """filename = os.path.join(args.eval_dir, 'LPIPS_%.5i_%s.json' % (step, mode))
-    utils.save_json(lpips_dict, filename)"""
-
     # calculate and report fid values
     calculate_fid_for_all_tasks(args, domains, step=step, mode=mode, lung_coords=coords_dict, ref_dims=reference_dims)
 
@@ -288,6 +277,8 @@ def calculate_metrics(nets, args, step, mode, domains, edge_loss):
     for folder_tifs in folder_tifs_list:
         folder_tifs_path = os.path.join(args.tifs_dir, folder_tifs)
         shutil.rmtree(folder_tifs_path, ignore_errors=True)
+
+    torch.cuda.empty_cache()
 
 def obtain_samples(nets, args, domains):
     print('Extracting images trg-translated...')
