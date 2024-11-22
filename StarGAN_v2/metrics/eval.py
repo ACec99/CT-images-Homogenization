@@ -25,6 +25,7 @@ from radiomics import featureextractor
 import numpy as np
 import torch
 import gc
+from skimage import filters
 
 from metrics.fid import calculate_fid_for_all_tasks
 #from metrics.lpips import calculate_lpips_given_images
@@ -167,37 +168,70 @@ def calculate_metrics(nets, args, step, mode, domains, edge_loss):
                     s_trg = nets.style_encoder(x_ref, y_trg)
 
                 x_fake = nets.generator(x_src, s_trg, masks=masks)
+                binary_fake_list = []
+                binary_real_list = []
 
-                # save generated images to calculate FID later
                 for k in range(N):
+
+                    # save generated images to calculate FID later
+                    filename_single_tif = os.path.join(
+                        path_fake_tifs,
+                        '%.4i_%.2i.tif' % (i, k))
+                    utils.save_tif(x_fake[k], args.max_bound, args.min_bound, ncol=1,
+                                   filename=filename_single_tif)
+
+
                     patientID = patient_src[k]
 
-                    # edge extraction
+                    # bed removal
                     slice_fake = ((x_fake[k, 1, :, :].squeeze(0)).cpu()).numpy()
                     slice_fake = utils.RemoveBed(slice_fake)
 
                     slice_real = ((x_src[k, 1, :, :].squeeze(0)).cpu()).numpy()
                     slice_real = utils.RemoveBed(slice_real)
 
-                    tensor_real = (((torch.tensor(slice_real)).unsqueeze(0)).unsqueeze(0)).to(device)
-                    tensor_fake = (((torch.tensor(slice_fake)).unsqueeze(0)).unsqueeze(0)).to(device)
-                    slice_edge, _, _ = edge_loss(tensor_real, tensor_fake)
-                    edge_values.append(slice_edge.item())
-
+                    # save the new slice in correspondence to the owner (patient) inside a dictionary, in order to rebuild the volume
                     if patientID not in volumes_fake_dict:
-                        volumes_fake_dict[patientID] = [slice_fake.to(device)] #[x_fake[k, 1, :, :]]
+                        volumes_fake_dict[patientID] = [slice_fake] #[x_fake[k, 1, :, :]]
                     else:
-                        volumes_fake_dict[patientID].append(slice_fake.to(device)) #(x_fake[k, 1, :, :])
+                        volumes_fake_dict[patientID].append(slice_fake) #(x_fake[k, 1, :, :])
 
-                    filename_single_tif = os.path.join(
-                        path_fake_tifs,
-                        '%.4i_%.2i.tif' % (i, k))
-                    utils.save_tif(x_fake[k], args.max_bound, args.min_bound, ncol=1,
-                                     filename=filename_single_tif)
+                    # extraction of lungs (masks)
+                    lung_fake = utils.segment_lung(slice_fake)
+                    lung_real = utils.segment_lung(slice_real)
+
+                    # APPLICATION OTSU ALGORITHM #
+                    ## Application of Otsu's threshold
+                    threshold_value_fake = filters.threshold_otsu(lung_fake)
+                    threshold_value_real = filters.threshold_otsu(lung_real)
+                    ## Thresholding the image to segment it
+                    binary_fake = lung_fake > threshold_value_fake
+                    binary_real = lung_real > threshold_value_real
+
+                    # Append the binary images to the respective lists
+                    binary_fake_list.append(torch.tensor(binary_fake, dtype=torch.float32))
+                    binary_real_list.append(torch.tensor(binary_real, dtype=torch.float32))
+
+                # Stack the lists into tensors
+                binary_fake_tensor = torch.stack(binary_fake_list).to(device)  # Shape: (N, H, W)
+                #binary_fake_tensor = binary_fake_tensor.unsqueeze(1) # Shape: (N, C, H, W)
+                binary_real_tensor = torch.stack(binary_real_list).to(device)  # Shape: (N, H, W)
+                #binary_real_tensor = binary_real_tensor.unsqueeze(1)  # Shape: (N, C, H, W)
+                #slice_edge, _, _ = edge_loss(tensor_real, tensor_fake)
+                similarity_measure = edge_loss(binary_fake_tensor, binary_real_tensor)
+                similarity_measure = similarity_measure.mean()
+                #edge_values.append(slice_edge.item())
+                print(f"slice_edge is: {similarity_measure}")
+                edge_values.append(similarity_measure)
+
+            #edge_values_mean = np.mean(np.array(edge_values))
+            stacked_edge_values = torch.stack(edge_values)
+            print(f"stacked_edge_values is: {stacked_edge_values}, with the shape: {stacked_edge_values.shape}")
+            # Compute the average
+            edge_values_mean = torch.mean(stacked_edge_values, dim=0)
+            edge_per_dom_translation[task] = edge_values_mean.item()
 
             torch.cuda.empty_cache()
-            edge_values_mean = np.mean(np.array(edge_values))
-            edge_per_dom_translation[task] = edge_values_mean
             ### RADIOMIC FEATURE COMPARISONS ###
             if mode == 'latent':
                 print("Calculating radiomic features...")

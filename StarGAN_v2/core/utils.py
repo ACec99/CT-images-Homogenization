@@ -37,6 +37,9 @@ from PIL import Image, ImageColor, ImageDraw, ImageFont
 
 import random, torch, os, numpy as np
 from skimage import filters, morphology, measure
+from medpy.filter.smoothing import anisotropic_diffusion
+from scipy.ndimage import median_filter
+from sklearn.cluster import KMeans
 import yaml
 
 def extract_metadata(args):
@@ -382,7 +385,7 @@ def translate_using_latent(nets, args, x_src, y_src, y_trg_list, z_trg_list, fil
         text_images = torch.from_numpy(text_images).to(x_src.device)"""
 
         x_concat = [x_src]
-        x_concat_edge = []
+        #x_concat_edge = []
 
         for z_trg in z_trg_list:
 
@@ -392,7 +395,7 @@ def translate_using_latent(nets, args, x_src, y_src, y_trg_list, z_trg_list, fil
             #s_trg = torch.lerp(s_avg, s_trg, psi) # linear interpolation
             x_fake = nets.generator(x_src, s_trg, masks=masks)
             x_concat += [x_fake]
-            if edge_loss is not None and not x_concat_edge:
+            """if edge_loss is not None and not x_concat_edge:
                 loss_edge_list = []
                 x_fake_1_ch = x_fake[:, 1, :, :].unsqueeze(1)
                 x_real_1_ch = x_src[:, 1, :, :].unsqueeze(1)
@@ -407,18 +410,18 @@ def translate_using_latent(nets, args, x_src, y_src, y_trg_list, z_trg_list, fil
                 x_concat_edge += [laplacian_x_fake_all]
                 # ---------------------------------------- #
                 labels = [f"{src_domains[j]} \n {loss_edge_list[j]}" for j in range(len(loss_edge_list))]
-                print(labels)
+                #print(labels)
                 edge_loss_labels.append(labels)
-                # --------------------------------------- #
+                # --------------------------------------- #"""
 
         # transform tensor in image
         x_concat = torch.cat(x_concat, dim=0)
         img_concat = save_image(x_concat, args.max_bound, args.min_bound, N)
         table_imgs_list.append(img_concat)
-        if edge_loss is not None:
+        """if edge_loss is not None:
             x_concat_edge = torch.cat(x_concat_edge, dim=0)
             img_concat_edge = save_image(x_concat_edge, args.max_bound, args.min_bound, N)
-            table_imgs_edge_list.append(img_concat_edge)
+            table_imgs_edge_list.append(img_concat_edge)"""
 
     table_imgs_np = np.array(table_imgs_list)
     #print("la shape di table_imgs_np nell'using_latent è:", table_imgs_np.shape)
@@ -426,18 +429,19 @@ def translate_using_latent(nets, args, x_src, y_src, y_trg_list, z_trg_list, fil
 
     labels = [src_domains]
     save_grid(table_imgs_np, labels, nrows, 2, filename, domains)
-    if edge_loss is not None:
+    """if edge_loss is not None:
         print(edge_loss_labels)
         table_imgs_edge_np = np.array(table_imgs_edge_list)
         #print("la shape di table_imgs_np nell'using_latent è:", table_imgs_np.shape)
         nrows = int(np.ceil(len(domains) / 2))
-
-        """labels = [src_domains]
+        
+        # the following two code lines were already commented
+        labels = [src_domains]
         save_grid(table_imgs_edge_np, labels, nrows, 2, filename_edge, domains)"""
 
         # ---------------------------------------------------------------------------------------------------- #
         # Combine src_domains with corresponding loss_edge values for labels
-        save_grid(table_imgs_edge_np, edge_loss_labels, nrows, 2, filename_edge, domains)
+        #save_grid(table_imgs_edge_np, edge_loss_labels, nrows, 2, filename_edge, domains)
         # ---------------------------------------------------------------------------------------------------- #
 
 
@@ -658,31 +662,108 @@ def tensor2ndarray255(images):
     images = torch.clamp(images * 0.5 + 0.5, 0, 1)
     return images.cpu().numpy().transpose(0, 2, 3, 1) * 255
 
-def RemoveBed(img):
+def RemoveBed(img_batch):
+    """
+    Applies the RemoveBed operation to a batch of images.
 
-    nan_mask = np.isnan(img)
+    Parameters:
+        img_batch (numpy.ndarray): A batch of images with shape (batch_size, height, width).
 
-    # handle nan values
-    if np.sum(nan_mask) > 0:
-        # Use nearest-neighbor interpolation to fill NaNs
-        filled_image = ndimage.generic_filter(img, np.nanmean, size=3, mode='mirror')
+    Returns:
+        numpy.ndarray: A batch of processed images with the same shape as the input.
+    """
 
-        # Replace NaNs with interpolated values
-        img[nan_mask] = filled_image[nan_mask]
+    cleaned_batch = []
 
-    mask = img > filters.threshold_otsu(img)
-    print(f"the mask size is:{mask.shape}")
+    for img in img_batch:
 
-    label_image = measure.label(mask, background=0)
-    print(label_image.shape)
-    props = measure.regionprops(label_image)
+        # ensure the input image is copied to avoid modifying the original
+        img = img.copy()
 
-    mask = max(props, key=lambda x: x.area)
-    mask = (label_image == mask.label).astype(np.uint8)
+        nan_mask = np.isnan(img)
 
-    mask = morphology.binary_erosion(mask)
-    mask = scipy.ndimage.binary_fill_holes(mask)
+        # handle nan values
+        if np.sum(nan_mask) > 0:
+            # Use nearest-neighbor interpolation to fill NaNs
+            filled_image = ndimage.generic_filter(img, np.nanmean, size=3, mode='mirror')
 
-    img[~mask] = -1024 #-1
+            # Replace NaNs with interpolated values
+            img[nan_mask] = filled_image[nan_mask]
 
-    return img
+        #  Otsu thresholding to create a mask
+        mask = img > filters.threshold_otsu(img)
+
+        # label connected components
+        label_image = measure.label(mask, background=0)
+
+        # find the largest connected component
+        props = measure.regionprops(label_image)
+        largest_region = max(props, key=lambda x: x.area)
+        mask = (label_image == largest_region.label).astype(np.uint8)
+
+        # morphological operations
+        mask = morphology.binary_erosion(mask)
+        mask = scipy.ndimage.binary_fill_holes(mask)
+
+        img[~mask] = -1
+
+        cleaned_batch.append(img)
+
+    return np.array(cleaned_batch)
+
+@torch.no_grad()
+def segment_lung(img):
+    # function sourced from https://www.kaggle.com/c/data-science-bowl-2017#tutorial
+    """
+    This segments the Lung Image(Don't get confused with lung nodule segmentation)
+    """
+    img = img.copy()
+
+    mean = np.mean(img)
+    std = np.std(img)
+    img = img - mean
+    img = img / std
+
+    """plt.hist(img.flatten(), bins=200)
+    plt.show()"""
+
+    middle = img[100:400, 100:400]
+    mean = np.mean(middle)
+    max = np.max(img)
+    min = np.min(img)
+    # remove the underflow bins
+    img[img == max] = mean
+    img[img == min] = mean
+
+    # apply median filter
+    img = median_filter(img, size=3)
+    # apply anistropic non-linear diffusion filter- This removes noise without blurring the nodule boundary
+    img = anisotropic_diffusion(img)
+
+    kmeans = KMeans(n_clusters=2).fit(np.reshape(middle, [np.prod(middle.shape), 1]))
+    centers = sorted(kmeans.cluster_centers_.flatten())
+    threshold = np.mean(centers)
+    thresh_img = np.where(img < threshold, 1.0, 0.0)  # threshold the image
+    eroded = morphology.erosion(thresh_img, np.ones([4, 4]))
+    dilation = morphology.dilation(eroded, np.ones([10, 10]))
+    labels = measure.label(dilation)
+    label_vals = np.unique(labels)
+    regions = measure.regionprops(labels)
+    good_labels = []
+    for prop in regions:
+        B = prop.bbox
+        if B[2] - B[0] < 475 and B[3] - B[1] < 475 and B[0] > 40 and B[2] < 472:
+            good_labels.append(prop.label)
+    mask = np.ndarray([512, 512], dtype=np.int8)
+    mask[:] = 0
+    #
+    #  The mask here is the mask for the lungs--not the nodes
+    #  After just the lungs are left, we do another large dilation
+    #  in order to fill in and out the lung mask
+    #
+    for N in good_labels:
+        mask = mask + np.where(labels == N, 1, 0)
+    # mask = morphology.dilation(mask,np.ones([2,2])) # one last dilation
+    # mask consists of 1 and 0. Thus by mutliplying with the orginial image, sections with 1 will remain
+    return mask * img
+

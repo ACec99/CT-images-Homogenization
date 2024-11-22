@@ -127,6 +127,41 @@ class _GridExtractor(nn.Module):
 
 ### FOR EDGE LOSS ###
 
+class IoULoss(nn.Module):
+
+    def __init__(self, eps=1e-3):
+        super(IoULoss, self).__init__()
+        self.eps = eps # created to avoid division by zero
+
+
+    def forward(self, x, y):
+        """
+        Computes the IoU loss for batched inputs.
+
+        Args:
+            x (torch.Tensor): Masks of generated slices --> shape (B, H, W).
+            y (torch.Tensor): Masks of original (real) slices --> shape (B, H, W).
+
+        Returns:
+            torch.Tensor: Average IoU loss across the batch.
+        """
+
+        print(f"x and y are located in device: {x.device}, {y.device}")
+
+        # Flatten the masks into 2D tensors of shape (B, H*W)
+        x = x.view(x.size(0), -1)  # Shape: (B, H*W)
+        y = y.view(y.size(0), -1)  # Shape: (B, H*W)
+
+        # Compute intersection and union for each element in the batch
+        intersection = torch.sum(x * y, dim=1)  # Shape: (B,)
+        union = torch.sum(x, dim=1) + torch.sum(y, dim=1) - intersection  # Shape: (B,)
+
+        # Avoid division by zero by adding a small epsilon to the denominator
+        iou = intersection / (union + 1e-6)  # Shape: (B,)
+
+        # Return the average IoU across the batch
+        return 1 - iou.mean()
+
 class CharbonnierLoss(nn.Module):
     """Charbonnier Loss (L1)"""
 

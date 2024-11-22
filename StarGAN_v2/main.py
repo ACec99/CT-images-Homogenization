@@ -46,8 +46,8 @@ def main(args):
     # ----------------------------------------------------------------------------- #
     domains = [
         'GE MEDICAL SYSTEMS LightSpeed QX-i -- BONE',
-        'SIEMENS Sensation 16 -- B30f',
-        'GE MEDICAL SYSTEMS LightSpeed16 -- STANDARD'
+        'SIEMENS Sensation 16 -- B30f'
+        #'GE MEDICAL SYSTEMS LightSpeed16 -- STANDARD'
         #'GE MEDICAL SYSTEMS LightSpeed Pro 16 -- STANDARD'
         #'SIEMENS Sensation Open -- B30f'
     ]
@@ -214,6 +214,8 @@ if __name__ == '__main__':
                         help='Whether to add edge loss in your model.')
     parser.add_argument('--ssim', type=bool, default=False,
                         help='Whether to use SSIM as edge loss in your model.')
+    parser.add_argument('--lung_edge_loss', type=bool, default=False,
+                        help='Whether to use IoU on segmented lungs as edge loss in your model.')
     parser.add_argument('--resize_bool', type=bool, default=False,
                         help='Whether to apply transformations in the dataloader.')
 
