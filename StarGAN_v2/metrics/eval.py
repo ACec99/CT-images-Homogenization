@@ -184,11 +184,14 @@ def calculate_metrics(nets, args, step, mode, domains, edge_loss):
                     patientID = patient_src[k]
 
                     # bed removal
-                    slice_fake = ((x_fake[k, 1, :, :].squeeze(0)).cpu()).numpy()
+                    slice_fake = ((x_fake[k, 1, :, :].unsqueeze(0)).cpu()).numpy()
                     slice_fake = utils.RemoveBed(slice_fake)
 
-                    slice_real = ((x_src[k, 1, :, :].squeeze(0)).cpu()).numpy()
+                    slice_real = ((x_src[k, 1, :, :].unsqueeze(0)).cpu()).numpy()
                     slice_real = utils.RemoveBed(slice_real)
+
+                    slice_fake = slice_fake.squeeze(0)
+                    slice_real = slice_real.squeeze(0)
 
                     # save the new slice in correspondence to the owner (patient) inside a dictionary, in order to rebuild the volume
                     if patientID not in volumes_fake_dict:
@@ -209,8 +212,8 @@ def calculate_metrics(nets, args, step, mode, domains, edge_loss):
                     binary_real = lung_real > threshold_value_real
 
                     # Append the binary images to the respective lists
-                    binary_fake_list.append(torch.tensor(binary_fake, dtype=torch.float32))
-                    binary_real_list.append(torch.tensor(binary_real, dtype=torch.float32))
+                    binary_fake_list.append(torch.tensor(binary_fake, dtype=torch.int32))
+                    binary_real_list.append(torch.tensor(binary_real, dtype=torch.int32))
 
                 # Stack the lists into tensors
                 binary_fake_tensor = torch.stack(binary_fake_list).to(device)  # Shape: (N, H, W)
@@ -221,7 +224,7 @@ def calculate_metrics(nets, args, step, mode, domains, edge_loss):
                 similarity_measure = edge_loss(binary_fake_tensor, binary_real_tensor)
                 similarity_measure = similarity_measure.mean()
                 #edge_values.append(slice_edge.item())
-                print(f"slice_edge is: {similarity_measure}")
+                #print(f"slice_edge is: {similarity_measure}")
                 edge_values.append(similarity_measure)
 
             #edge_values_mean = np.mean(np.array(edge_values))

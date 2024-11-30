@@ -160,7 +160,7 @@ class IoULoss(nn.Module):
         iou = intersection / (union + 1e-6)  # Shape: (B,)
 
         # Return the average IoU across the batch
-        return 1 - iou.mean()
+        return 1 - iou
 
 class CharbonnierLoss(nn.Module):
     """Charbonnier Loss (L1)"""
@@ -471,16 +471,16 @@ class Discriminator(nn.Module):
 
 
 def build_model(args):
-    generator = nn.DataParallel(Generator(args.img_size, args.style_dim, w_hpf=args.w_hpf))
-    mapping_network = nn.DataParallel(MappingNetwork(args.latent_dim, args.style_dim, args.num_domains))
-    style_encoder = nn.DataParallel(StyleEncoder(args.img_size, args.style_dim, args.num_domains))
-    discriminator = nn.DataParallel(Discriminator(args.img_size, args.num_domains))
+    generator = nn.DataParallel(Generator(args.img_size, args.style_dim, w_hpf=args.w_hpf).cuda())
+    mapping_network = nn.DataParallel(MappingNetwork(args.latent_dim, args.style_dim, args.num_domains).cuda())
+    style_encoder = nn.DataParallel(StyleEncoder(args.img_size, args.style_dim, args.num_domains).cuda())
+    discriminator = nn.DataParallel(Discriminator(args.img_size, args.num_domains).cuda())
     generator_ema = copy.deepcopy(generator)
     mapping_network_ema = copy.deepcopy(mapping_network)
     style_encoder_ema = copy.deepcopy(style_encoder)
     # ---------------------------------------------- #
     if args.texture_loss:
-        attention_layer = init_net(nn.DataParallel(Self_Attn(1, 'relu')))
+        attention_layer = init_net(nn.DataParallel(Self_Attn(1, 'relu').cuda()))
         nets = Munch(generator=generator,
                      attention_layer=attention_layer,
                      mapping_network=mapping_network,

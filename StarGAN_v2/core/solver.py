@@ -58,7 +58,7 @@ class Solver(nn.Module):
         #if self.args.edge_loss:
         # lo inizializzo sempre perchè mi serve a prescindere per calcolare le metriche
         if args.ssim:
-            self.ssim_loss = SSIMLoss(data_range=2.0) # we put 2 as data_range because it represents the range of the imput data => our data are normalized in [-1,1] => 1 - (-1) = 2
+            self.ssim_loss = SSIMLoss(data_range=1.0) # we put 2 as data_range because it represents the range of the imput data => our data are normalized in [-1,1] => 1 - (-1) = 2
         else:
             self.ssim_loss = None
         self.edge_loss = nn.DataParallel(EdgeLoss())
@@ -126,7 +126,7 @@ class Solver(nn.Module):
             training_history_csv_path = os.path.join(args.loss_monitoring_dir, 'history.csv')
             training_history_csv_path_df = pd.read_csv(training_history_csv_path, index_col=False)
             training_history = training_history_csv_path_df.to_dict(orient='list')
-        elif (args.texture_loss or args.ssim) and not args.edge_loss:
+        elif args.texture_loss and not args.edge_loss:
             training_history = {
                 'loss_d_latent': [],
                 'loss_d_reference': [],
@@ -143,7 +143,7 @@ class Solver(nn.Module):
                 'loss_g_latent': [],
                 'loss_g_reference': []
             }
-        elif (args.texture_loss or args.ssim) and args.edge_loss:
+        elif args.texture_loss and args.edge_loss:
             training_history = {
                 'loss_d_latent': [],
                 'loss_d_reference': [],
@@ -158,6 +158,23 @@ class Solver(nn.Module):
                 'loss_g_ds_reference': [],
                 'loss_g_cyc_reference': [],
                 'loss_g_texture_reference': [],
+                'loss_g_edge_reference': [],
+                'loss_g_latent': [],
+                'loss_g_reference': []
+            }
+        elif args.edge_loss and not args.texture_loss:
+            training_history = {
+                'loss_d_latent': [],
+                'loss_d_reference': [],
+                'loss_g_adv_latent': [],
+                'loss_g_sty_latent': [],
+                'loss_g_ds_latent': [],
+                'loss_g_cyc_latent': [],
+                'loss_g_edge_latent': [],
+                'loss_g_adv_reference': [],
+                'loss_g_sty_reference': [],
+                'loss_g_ds_reference': [],
+                'loss_g_cyc_reference': [],
                 'loss_g_edge_reference': [],
                 'loss_g_latent': [],
                 'loss_g_reference': []
@@ -193,6 +210,10 @@ class Solver(nn.Module):
             print("shape of x_ref is:", x_ref.shape)
             z_trg, z_trg2 = inputs.z_trg, inputs.z_trg2
             print("shape of z_trg is:", z_trg.shape)
+
+            x_real, y_org = x_real.to(self.device), y_org.to(self.device)
+            x_ref, x_ref2, y_trg = x_ref.to(self.device), x_ref2.to(self.device), y_trg.to(self.device)
+            z_trg, z_trg2 = z_trg.to(self.device), z_trg2.to(self.device)
 
             masks = nets.fan.get_heatmap(x_real) if args.w_hpf > 0 else None
 
@@ -273,7 +294,7 @@ class Solver(nn.Module):
                     training_history['loss_g_sty_reference'].append(g_losses_ref.sty)
                     training_history['loss_g_ds_reference'].append(g_losses_ref.ds)
                     training_history['loss_g_cyc_reference'].append(g_losses_ref.cyc)
-                    if args.texture_loss or args.ssim:
+                    if args.texture_loss:
                         training_history['loss_g_texture_latent'].append(g_losses_latent.texture)
                         training_history['loss_g_texture_reference'].append(g_losses_ref.texture)
                     if args.edge_loss:
@@ -350,18 +371,19 @@ class Solver(nn.Module):
                     axs[4, 1].set_title('loss_g_cyc_reference')
 
                     if args.texture_loss:
-                        axs[5, 0].plot(x_axis, training_history['loss_g_texture_latent'])
-                        axs[5, 0].set_title('loss_g_texture_latent')
+                        if args.ssim:
+                            axs[5, 0].plot(x_axis, training_history['loss_g_texture_latent'])
+                            axs[5, 0].set_title('loss_g_ssim_latent')
 
-                        axs[5, 1].plot(x_axis, training_history['loss_g_texture_reference'])
-                        axs[5, 1].set_title('loss_g_texture_reference')
-                    if args.ssim:
-                        axs[5, 0].plot(x_axis, training_history['loss_g_texture_latent'])
-                        axs[5, 0].set_title('loss_g_ssim_latent')
+                            axs[5, 1].plot(x_axis, training_history['loss_g_texture_reference'])
+                            axs[5, 1].set_title('loss_g_ssim_reference')
+                        else:
+                            axs[5, 0].plot(x_axis, training_history['loss_g_texture_latent'])
+                            axs[5, 0].set_title('loss_g_texture_latent')
 
-                        axs[5, 1].plot(x_axis, training_history['loss_g_texture_reference'])
-                        axs[5, 1].set_title('loss_g_ssim_reference')
-                    if args.edge_loss:
+                            axs[5, 1].plot(x_axis, training_history['loss_g_texture_reference'])
+                            axs[5, 1].set_title('loss_g_texture_reference')
+                    if args.edge_loss and args.texture_loss:
                         if args.lung_edge_loss:
                             axs[6, 0].plot(x_axis, training_history['loss_g_edge_latent'])
                             axs[6, 0].set_title('loss_g_IoU_latent')
@@ -374,6 +396,20 @@ class Solver(nn.Module):
 
                             axs[6, 1].plot(x_axis, training_history['loss_g_edge_reference'])
                             axs[6, 1].set_title('loss_g_edge_reference')
+                    elif args.edge_loss and not args.texture_loss:
+                        if args.lung_edge_loss:
+                            axs[5, 0].plot(x_axis, training_history['loss_g_edge_latent'])
+                            axs[5, 0].set_title('loss_g_IoU_latent')
+
+                            axs[5, 1].plot(x_axis, training_history['loss_g_edge_reference'])
+                            axs[5, 1].set_title('loss_g_IoU_reference')
+                        else:
+                            axs[5, 0].plot(x_axis, training_history['loss_g_edge_latent'])
+                            axs[5, 0].set_title('loss_g_edge_latent')
+
+                            axs[5, 1].plot(x_axis, training_history['loss_g_edge_reference'])
+                            axs[5, 1].set_title('loss_g_edge_reference')
+
 
                     plt.tight_layout()
 
@@ -529,51 +565,56 @@ def compute_g_loss(nets, texture_extractor, edge_loss, args, x_real, y_org, y_tr
 
     losses = Munch(adv=loss_adv.item(),
                    sty=loss_sty.item(),
-                    ds=loss_ds.item(),
-                    cyc=loss_cyc.item())
+                   ds=loss_ds.item(),
+                   cyc=loss_cyc.item())
     
     # texture loss
     if args.texture_loss: #and z_trgs is None:
-        start = 128 # (512-256)/2
-        end = start + 256 # 128 + 256
-        x_rec_1_ch = x_rec[:, 1, start:end, start:end].unsqueeze(1)
-        x_real_1_ch = x_real[:, 1, start:end, start:end].unsqueeze(1)
-        #x_rec_1_ch = x_ref[:, 1, start:end, start:end].unsqueeze(1)
-        #x_real_1_ch = x_fake[:, 1, start:end, start:end].unsqueeze(1)
-        loss_texture, _, _ = _texture_loss(x_rec_1_ch, x_real_1_ch, args, texture_extractor, nets.attention_layer)
-        loss += loss_texture
-        losses.texture = loss_texture.item()
-    if args.ssim:
-        """x_fake_min = torch.min(tensor_fake)
-        x_fake_max = torch.max(tensor_fake)
+        if args.ssim:
+            batch_rec = (x_rec[:, 1, :, :]).detach().cpu().numpy()
+            batch_cleaned_rec = utils.RemoveBed(batch_rec)
 
-        x_real_min = torch.min(tensor_real)
-        x_real_max = torch.max(tensor_real)
+            batch_real = (x_real[:, 1, :, :]).detach().cpu().numpy()
+            batch_cleaned_real = utils.RemoveBed(batch_real)
 
-        max = torch.max(x_fake_max, x_real_max).item()
-        min = torch.min(x_fake_min, x_real_min).item()
+            tensor_real = (torch.tensor(batch_cleaned_real)).unsqueeze(1)
+            tensor_rec = (torch.tensor(batch_cleaned_rec)).unsqueeze(1)
 
-        x_fake_1_ch = ((tensor_fake - min) / (max - min))
-        x_real_1_ch = ((tensor_real - min) / (max - min))"""
+            x_rec_min = torch.min(tensor_rec)
+            x_rec_max = torch.max(tensor_rec)
 
-        batch_rec = (x_rec[:, 1, :, :]).detach().cpu().numpy()
-        batch_cleaned_rec = utils.RemoveBed(batch_rec)
+            x_real_min = torch.min(tensor_real)
+            x_real_max = torch.max(tensor_real)
 
-        batch_real = (x_real[:, 1, :, :]).detach().cpu().numpy()
-        batch_cleaned_real = utils.RemoveBed(batch_real)
+            max = torch.max(x_rec_max, x_real_max).item()
+            min = torch.min(x_rec_min, x_real_min).item()
 
-        tensor_real = (torch.tensor(batch_cleaned_real)).unsqueeze(1)
-        tensor_rec = (torch.tensor(batch_cleaned_rec)).unsqueeze(1)
+            x_rec_1_ch = ((tensor_rec - min) / (max - min))
+            x_real_1_ch = ((tensor_real - min) / (max - min))
 
-        loss_ssim = ssim_loss(tensor_real, tensor_rec)
-        loss += loss_ssim
+            loss_ssim = ssim_loss(x_real_1_ch, x_rec_1_ch)
+            loss += loss_ssim
 
-        losses.texture = loss_ssim.item()
+            losses.texture = loss_ssim.item()
+
+        else:
+
+            start = 128 # (512-256)/2
+            end = start + 256 # 128 + 256
+            x_rec_1_ch = x_rec[:, 1, start:end, start:end].unsqueeze(1)
+            x_real_1_ch = x_real[:, 1, start:end, start:end].unsqueeze(1)
+            #x_rec_1_ch = x_ref[:, 1, start:end, start:end].unsqueeze(1)
+            #x_real_1_ch = x_fake[:, 1, start:end, start:end].unsqueeze(1)
+            loss_texture, _, _ = _texture_loss(x_rec_1_ch, x_real_1_ch, args, texture_extractor, nets.attention_layer)
+            loss += loss_texture
+            losses.texture = loss_texture.item()
 
     if args.edge_loss:
-        #batch_fake = (x_fake[:, 1, :, :]).detach().cpu().numpy()
-        batch_rec = (x_rec[:, 1, :, :]).detach().cpu().numpy()
-        batch_cleaned_rec = utils.RemoveBed(batch_rec)
+        batch_fake = (x_fake[:, 1, :, :]).detach().cpu().numpy()
+        #batch_rec = (x_rec[:, 1, :, :]).detach().cpu().numpy()
+        #batch_cleaned_rec = utils.RemoveBed(batch_rec)
+        batch_cleaned_fake = utils.RemoveBed(batch_fake)
+
         """batch_rec_copy = batch_rec.copy()
         for sf in range(batch_rec_copy.shape[0]):
             slice_without_bed = utils.RemoveBed(batch_rec_copy[sf, :, :])
@@ -589,31 +630,48 @@ def compute_g_loss(nets, texture_extractor, edge_loss, args, x_real, y_org, y_tr
 
         if args.lung_edge_loss:
 
-            binary_rec_batch = []
+            """binary_rec_batch = []
             for brec in range(batch_cleaned_rec.shape[0]):
                 lung_rec = utils.segment_lung(batch_cleaned_rec[brec, :, :])
                 threshold_value_rec = filters.threshold_otsu(lung_rec)
                 binary_rec = lung_rec > threshold_value_rec
-                binary_rec_batch.append(torch.tensor(binary_rec, dtype=torch.float32))
-            binary_rec_tensor = torch.stack(binary_rec_batch).cuda()
+                binary_rec_batch.append(torch.tensor(binary_rec, dtype=torch.int32))
+            binary_rec_tensor = torch.stack(binary_rec_batch).cuda()"""
+            binary_fake_batch = []
+            for bfake in range(batch_cleaned_fake.shape[0]):
+                #lung_fake = utils.segment_lung(batch_cleaned_fake[bfake, :, :])
+                lung_fake = batch_cleaned_fake[bfake, :, :]
+                threshold_value_fake = filters.threshold_otsu(lung_fake)
+                binary_fake = lung_fake > threshold_value_fake
+                binary_fake_batch.append(torch.tensor(binary_fake, dtype=torch.int32))
+            binary_fake_tensor = torch.stack(binary_fake_batch).cuda()
 
             binary_real_batch = []
             for breal in range(batch_cleaned_real.shape[0]):
-                lung_real = utils.segment_lung(batch_cleaned_real[breal, :, :])
+                #lung_real = utils.segment_lung(batch_cleaned_real[breal, :, :])
+                lung_real = batch_cleaned_real[breal, :, :]
                 threshold_value_real = filters.threshold_otsu(lung_real)
                 binary_real = lung_real > threshold_value_real
-                binary_real_batch.append(torch.tensor(binary_real, dtype=torch.float32))
+                binary_real_batch.append(torch.tensor(binary_real, dtype=torch.int32))
             binary_real_tensor = torch.stack(binary_real_batch).cuda()
 
-            loss_edge = edge_loss(binary_rec_tensor, binary_real_tensor)
+            #loss_edge = edge_loss(binary_rec_tensor, binary_real_tensor)
+            loss_edge = edge_loss(binary_fake_tensor, binary_real_tensor)
+            #print(loss_edge)
+
             loss_edge = loss_edge.mean()
 
-            loss -= loss_edge
+            loss += loss_edge
 
         else:
 
-            tensor_real = (torch.tensor(batch_real)).unsqueeze(1)
-            tensor_fake = (torch.tensor(batch_rec)).unsqueeze(1)
+            #tensor_real = (torch.tensor(batch_real)).unsqueeze(1)
+            tensor_real = (torch.tensor(batch_cleaned_real)).unsqueeze(1)
+            #tensor_fake = (torch.tensor(batch_rec)).unsqueeze(1)
+            #tensor_fake = (torch.tensor(batch_fake)).unsqueeze(1)
+            tensor_fake = (torch.tensor(batch_cleaned_fake)).unsqueeze(1)
+            #tensor_rec = (torch.tensor(batch_cleaned_rec)).unsqueeze(1)
+
             loss_edge, _, _ = edge_loss(tensor_real, tensor_fake)
             #loss_edge = edge_loss(tensor_real, tensor_fake)
             loss_edge = loss_edge.mean() # SSIMLoss compute automatically the average over all the pairs of images
