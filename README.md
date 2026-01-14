@@ -46,8 +46,10 @@ In order to evaluate the performances of this model, we used three complementary
 
 ## Results
 All results are compared with those obtained from the baseline StarGAN
-<img width="500" height="400" alt="image" src="https://github.com/user-attachments/assets/a702d095-4d63-449e-bc3e-9263bbde4baf" />
+<img width="900" height="800" alt="image" src="https://github.com/user-attachments/assets/a702d095-4d63-449e-bc3e-9263bbde4baf" />
+
 <img width="500" height="400" alt="image" src="https://github.com/user-attachments/assets/9ac1b028-7519-4fe5-9d6e-f53e4503b14a" />
+
 <img width="500" height="400" alt="image" src="https://github.com/user-attachments/assets/918d564a-9119-4cb0-a615-91aa4343d68a" />
 
 
