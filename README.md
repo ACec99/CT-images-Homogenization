@@ -18,5 +18,10 @@ We then **train a deep learning model capable of one-to-many domain translation*
 **LIDC-IDRI** (The Lung Image Database Consortium and Image Database Resource Initiative) https://doi.org/10.7937/K9/TCIA.2015.LO9QL9SX
 
 ## Texture-Aware StarGAN architecture 
+Our approach builds upon the StarGAN architecture, a multi-domain image-to-image translation framework designed to transform images across different styles using a single unified model. \\
+While StarGAN provides a strong baseline for cross-domain translation, it does not explicitly account for the complex texture variations that characterize CT images acquired with different scanners and reconstruction kernels.
+
+To address this limitation, we extend the original architecture by **introducing a multi-scale texture loss function**, which explicitly enforces texture consistency across domains at multiple spatial scales. This addition enables the model to better capture and harmonize kernel-induced texture differences while preserving anatomical structures.
+
 <img width="1713" height="970" alt="Texture-Aware-StarGAN-image_only_tx_loss" src="https://github.com/user-attachments/assets/62124675-56c8-4d6a-a3ae-766d121c2036" />
 
