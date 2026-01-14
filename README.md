@@ -35,11 +35,22 @@ Focusing on the Texture and Cycle Loss block, the architecture incorporates the 
 ## Evaluation methods
 In order to evaluate the performances of this model, we used three complementary analysis:
 - **Deep Features Alignment**: measure of the similarity between the real and generated images through the Fréchet Inception Distance (FID).
-  **GOAL:**evaluate the quality and diversity of generated images;
+  **GOAL**:evaluate the quality and diversity of generated images;
 - **Radiomic Features Alignment**: statistical comparison of radiomic features of input and target domains before and after harmonization.
-  **GOAL:**assess the impact of harmonization on radiomic feature differences across input and target domains;
+  **GOAL**:assess the impact of harmonization on radiomic feature differences across input and target domains;
 - **Edge Evaluation**: comparison of lungs structure extracted from the image before and after harmonization.
-  **GOAL:**evaluate the network's ability to preserve structural details during generation.
+  **GOAL**:evaluate the network's ability to preserve structural details during generation.
+
+## Visual Assessment 
+<img width="500" height="400" alt="image" src="https://github.com/user-attachments/assets/dca83962-9920-4b3f-b7dc-3d5dfe8b8de0" />
+
+## Results
+All results are compared with those obtained from the baseline StarGAN
+<img width="500" height="400" alt="image" src="https://github.com/user-attachments/assets/a702d095-4d63-449e-bc3e-9263bbde4baf" />
+<img width="500" height="400" alt="image" src="https://github.com/user-attachments/assets/9ac1b028-7519-4fe5-9d6e-f53e4503b14a" />
+<img width="500" height="400" alt="image" src="https://github.com/user-attachments/assets/918d564a-9119-4cb0-a615-91aa4343d68a" />
+
+
 
 
 
