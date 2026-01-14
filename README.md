@@ -42,7 +42,7 @@ In order to evaluate the performances of this model, we used three complementary
   **GOAL**:evaluate the network's ability to preserve structural details during generation.
 
 ## Visual Assessment 
-<img width="500" height="400" alt="image" src="https://github.com/user-attachments/assets/dca83962-9920-4b3f-b7dc-3d5dfe8b8de0" />
+<img width="900" height="800" alt="image" src="https://github.com/user-attachments/assets/dca83962-9920-4b3f-b7dc-3d5dfe8b8de0" />
 
 ## Results
 All results are compared with those obtained from the baseline StarGAN
