@@ -1,7 +1,22 @@
 # CT-images-Homogenization
 
 ## Motivation
-**Computed Tomography (CT)** images are widely used in medical research and clinical practice. However, images acquired from different scanners or using different acquisition and reconstruction settings can look substantially different, even when they belong to the same patient. These differences often appear as variations in image texture and contrast that are unrelated to the underlying anatomy or pathology. \\
+**Computed Tomography (CT)** images are widely used in medical research and clinical practice. However, images acquired from different scanners or using different acquisition and reconstruction settings can look substantially different, even when they belong to the same patient. These differences often appear as variations in image texture and contrast that are unrelated to the underlying anatomy or pathology. 
+
 These discrepancies can significantly affect image interpretability for both clinicians and machine learning and deep learning models. In particular, models trained on data from a single scanner or acquisition protocol often struggle to generalize to images from different sources, limiting their reliability and real-world applicability.
 
 Therefore, there is a **strong need for a single, consistent, and reliable image representation** that minimizes acquisition-induced variability while preserving clinically relevant anatomical and textural information. Achieving such harmonization is a **crucial step toward enabling reproducible analysis and the safe deployment of data-driven methods in real-world clinical settings**.
+
+## Idea
+Given the variability introduced by different CT acquisition procedures, we model CT harmonization as a **domain translation problem** driven by texture differences.
+
+**CT** images are first **grouped into domain**s based on the distribution of their radiomic texture features. Each **domain represents a consistent acquisition setup**. Through statistical analysis, we identify scanner type and reconstruction kernel as the primary sources of variability; consequently, **each scanner–kernel combination defines a domain**.
+
+We then **train a deep learning model capable of one-to-many domain translation**, allowing **any CT image from a source domain to be transformed into its corresponding representation in a target domain**. The model focuses on aligning texture characteristics across domains while preserving the underlying anatomical structures.
+
+## Dataset
+**LIDC-IDRI** (The Lung Image Database Consortium and Image Database Resource Initiative) https://doi.org/10.7937/K9/TCIA.2015.LO9QL9SX
+
+## Texture-Aware StarGAN architecture 
+<img width="1713" height="970" alt="Texture-Aware-StarGAN-image_only_tx_loss" src="https://github.com/user-attachments/assets/62124675-56c8-4d6a-a3ae-766d121c2036" />
+
